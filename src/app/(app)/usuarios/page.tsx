@@ -21,14 +21,14 @@ export default async function UsuariosPage() {
           name="name"
           required
           placeholder="Nombre"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
         />
         <input
           name="email"
           type="email"
           required
           placeholder="Email"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
         />
         <input
           name="password"
@@ -36,7 +36,7 @@ export default async function UsuariosPage() {
           required
           minLength={6}
           placeholder="Contraseña (mín. 6)"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
         />
         <button
           type="submit"

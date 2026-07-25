@@ -35,8 +35,8 @@ model Client {
 
 model Project {
   id           String       @id @default(cuid())
-  clientId     String
-  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId     String?
+  client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name         String
   description  String?
   createdAt    DateTime     @default(now())
@@ -45,8 +45,8 @@ model Project {
 
 model Subprocess {
   id        String     @id @default(cuid())
-  projectId String
-  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String?
+  project   Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   name      String
   order     Int        @default(0)
   createdAt DateTime   @default(now())

@@ -203,7 +203,7 @@ function FlowchartCanvas({ initialData, onSave }: FlowchartEditorProps) {
   }
 
   return (
-    <div className="h-[calc(100vh-140px)] w-full overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="h-full w-full overflow-hidden bg-white">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -227,7 +227,7 @@ function FlowchartCanvas({ initialData, onSave }: FlowchartEditorProps) {
                   <input
                     value={lane.label}
                     onChange={(e) => renameLane(lane.id, e.target.value)}
-                    className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs outline-none focus:border-slate-400"
+                    className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-slate-400"
                   />
                   <button
                     type="button"
