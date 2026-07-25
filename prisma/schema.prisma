@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Dev: SQLite (arranque sin depender de Railway). Cuando se provisione
+// Postgres, cambiar a "postgresql", borrar prisma/migrations y regenerar
+// (mismo proceso que se siguió en el proyecto hermano "electro").
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Usuarios (equipo interno, una sola firma — sin aislamiento multi-tenant)
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Clientes / Proyectos / Subprocesos / Flowchart
+// ---------------------------------------------------------------------------
+
+model Client {
+  id        String    @id @default(cuid())
+  name      String
+  createdAt DateTime  @default(now())
+  projects  Project[]
+}
+
+model Project {
+  id           String       @id @default(cuid())
+  clientId     String
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  createdAt    DateTime     @default(now())
+  subprocesses Subprocess[]
+}
+
+model Subprocess {
+  id        String     @id @default(cuid())
+  projectId String
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int        @default(0)
+  createdAt DateTime   @default(now())
+  flowchart Flowchart?
+}
+
+model Flowchart {
+  id           String     @id @default(cuid())
+  subprocessId String     @unique
+  subprocess   Subprocess @relation(fields: [subprocessId], references: [id], onDelete: Cascade)
+  lanes        Json // [{ id, label, order }]
+  nodes        Json // React Flow nodes (id, type=category, position, data)
+  edges        Json // React Flow edges
+  updatedAt    DateTime   @updatedAt
+}
