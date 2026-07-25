@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -22,9 +22,17 @@ import DecisionNode from "./nodes/DecisionNode";
 import TerminalNode from "./nodes/TerminalNode";
 import LabeledEdge from "./edges/LabeledEdge";
 import LaneLayer from "./LaneLayer";
-import Legend from "./Legend";
+import DiagramLegend from "./DiagramLegend";
 import { CATEGORY_CONFIG, CATEGORY_ORDER } from "@/lib/flowchart/categories";
 import { LANE_HEIGHT, laneTop, laneCenter } from "@/lib/flowchart/layout";
+import { flowchartDataSchema } from "@/lib/flowchart/schema";
+import {
+  computeExportBounds,
+  captureFlowchartPng,
+  downloadDataUrl,
+  downloadBlob,
+  slugify,
+} from "@/lib/flowchart/export";
 import type { FlowchartData, FlowchartNode, Lane, NodeCategory } from "@/lib/flowchart/types";
 
 const nodeTypes = {
@@ -62,6 +70,7 @@ function nextId(prefix: string) {
 }
 
 type FlowchartEditorProps = {
+  title: string;
   initialData: FlowchartData;
   onSave: (data: FlowchartData) => Promise<void>;
 };
@@ -74,12 +83,14 @@ export default function FlowchartEditor(props: FlowchartEditorProps) {
   );
 }
 
-function FlowchartCanvas({ initialData, onSave }: FlowchartEditorProps) {
+function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   const [lanes, setLanes] = useState<Lane[]>(initialData.lanes);
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowchartNode>(initialData.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialData.edges);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const onConnect: OnConnect = useCallback(
     (connection: Connection) => {
@@ -235,6 +246,75 @@ function FlowchartCanvas({ initialData, onSave }: FlowchartEditorProps) {
     }
   }
 
+  async function handleExportPng() {
+    setExporting("png");
+    try {
+      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0);
+      const dataUrl = await captureFlowchartPng(bounds);
+      downloadDataUrl(dataUrl, `${slugify(title)}.png`);
+    } catch {
+      window.alert("No se pudo exportar el PNG. Probá de nuevo.");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  async function handleExportPdf() {
+    setExporting("pdf");
+    try {
+      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0);
+      const dataUrl = await captureFlowchartPng(bounds);
+      const { jsPDF } = await import("jspdf");
+      const width = bounds.width + 48;
+      const height = bounds.height + 48;
+      const pdf = new jsPDF({
+        orientation: width > height ? "landscape" : "portrait",
+        unit: "px",
+        format: [width, height],
+      });
+      pdf.addImage(dataUrl, "PNG", 0, 0, width, height);
+      pdf.save(`${slugify(title)}.pdf`);
+    } catch {
+      window.alert("No se pudo exportar el PDF. Probá de nuevo.");
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  function handleExportJson() {
+    downloadBlob(
+      JSON.stringify({ lanes, nodes, edges }, null, 2),
+      "application/json",
+      `${slugify(title)}.json`
+    );
+  }
+
+  function handleImportClick() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    let parsed;
+    try {
+      parsed = flowchartDataSchema.parse(JSON.parse(await file.text()));
+    } catch {
+      window.alert("El archivo no es un JSON de flowchart válido.");
+      return;
+    }
+
+    if (!window.confirm("Esto reemplaza el diagrama actual (todavía sin guardar). ¿Continuar?")) {
+      return;
+    }
+
+    setLanes(parsed.lanes);
+    setNodes(parsed.nodes as FlowchartNode[]);
+    setEdges(parsed.edges as Edge[]);
+  }
+
   return (
     <div className="h-full w-full overflow-hidden bg-white">
       <ReactFlow
@@ -328,6 +408,55 @@ function FlowchartCanvas({ initialData, onSave }: FlowchartEditorProps) {
                 Guardado {savedAt.toLocaleTimeString()}
               </span>
             )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={handleImportFile}
+            />
+            <button
+              type="button"
+              onClick={handleImportClick}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Importar
+            </button>
+
+            <div className="relative">
+              <details className="group">
+                <summary className="list-none rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                  Exportar
+                </summary>
+                <div className="absolute right-0 z-10 mt-1 w-36 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+                  <button
+                    type="button"
+                    onClick={handleExportPng}
+                    disabled={exporting !== null}
+                    className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {exporting === "png" ? "Exportando..." : "PNG"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportPdf}
+                    disabled={exporting !== null}
+                    className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {exporting === "pdf" ? "Exportando..." : "PDF"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    JSON
+                  </button>
+                </div>
+              </details>
+            </div>
+
             <button
               type="button"
               onClick={handleSave}
@@ -339,9 +468,10 @@ function FlowchartCanvas({ initialData, onSave }: FlowchartEditorProps) {
           </div>
         </Panel>
 
-        <Panel position="bottom-left">
-          <Legend categoriesInUse={categoriesInUse} />
-        </Panel>
+        <DiagramLegend
+          categoriesInUse={categoriesInUse}
+          top={sortedLanes.length * LANE_HEIGHT + 10}
+        />
       </ReactFlow>
     </div>
   );

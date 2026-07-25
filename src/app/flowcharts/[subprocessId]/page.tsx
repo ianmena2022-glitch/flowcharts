@@ -42,7 +42,7 @@ export default async function FlowchartEditorPage({
         {context && <span className="text-xs text-slate-400">{context}</span>}
       </div>
       <div className="flex-1">
-        <FlowchartEditor initialData={initialData} onSave={handleSave} />
+        <FlowchartEditor title={subprocess.name} initialData={initialData} onSave={handleSave} />
       </div>
     </div>
   );
