@@ -6,11 +6,8 @@ generator client {
   output   = "../src/generated/prisma"
 }
 
-// Dev: SQLite (arranque sin depender de Railway). Cuando se provisione
-// Postgres, cambiar a "postgresql", borrar prisma/migrations y regenerar
-// (mismo proceso que se siguió en el proyecto hermano "electro").
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // ---------------------------------------------------------------------------
