@@ -19,9 +19,9 @@ export default function LaneLayer({ lanes }: { lanes: Lane[] }) {
               top: laneTop(index),
               width: LANE_WIDTH,
               height: LANE_HEIGHT,
-              borderTop: "1px solid #e2e8f0",
-              borderBottom: "1px solid #e2e8f0",
-              background: index % 2 === 0 ? "#fafafa" : "#f4f4f5",
+              borderTop: "2px solid #94a3b8",
+              borderBottom: "2px solid #94a3b8",
+              background: index % 2 === 0 ? "#ffffff" : "#dbe3ee",
             }}
           >
             <div
@@ -30,13 +30,15 @@ export default function LaneLayer({ lanes }: { lanes: Lane[] }) {
                 left: 8,
                 top: 8,
                 fontSize: 11,
-                fontWeight: 600,
-                color: "#475569",
+                fontWeight: 700,
+                color: "#1e293b",
                 background: "#ffffff",
-                border: "1px solid #e2e8f0",
+                border: "1px solid #94a3b8",
+                borderLeft: "4px solid #475569",
                 borderRadius: 4,
-                padding: "2px 8px",
+                padding: "2px 10px",
                 whiteSpace: "nowrap",
+                boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
               }}
             >
               {lane.label}

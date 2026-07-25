@@ -1,12 +1,17 @@
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
 import { CATEGORY_CONFIG } from "@/lib/flowchart/categories";
 import type { FlowchartNodeData } from "@/lib/flowchart/types";
+import EditableLabel from "./EditableLabel";
 
 export default function TerminalNode({
+  id,
   data,
   selected,
 }: NodeProps<Node<FlowchartNodeData>>) {
   const config = CATEGORY_CONFIG.terminal;
+  const onLabelChange = data.onLabelChange as
+    | ((nodeId: string, label: string) => void)
+    | undefined;
 
   return (
     <div
@@ -19,7 +24,7 @@ export default function TerminalNode({
     >
       <Handle type="target" position={Position.Left} id="left" />
       <Handle type="target" position={Position.Top} id="top" />
-      {data.label}
+      <EditableLabel label={data.label} onChange={(label) => onLabelChange?.(id, label)} />
       <Handle type="source" position={Position.Right} id="right" />
       <Handle type="source" position={Position.Bottom} id="bottom" />
     </div>

@@ -20,6 +20,7 @@ import "@xyflow/react/dist/style.css";
 import ActivityNode from "./nodes/ActivityNode";
 import DecisionNode from "./nodes/DecisionNode";
 import TerminalNode from "./nodes/TerminalNode";
+import LabeledEdge from "./edges/LabeledEdge";
 import LaneLayer from "./LaneLayer";
 import Legend from "./Legend";
 import { CATEGORY_CONFIG, CATEGORY_ORDER } from "@/lib/flowchart/categories";
@@ -30,6 +31,10 @@ const nodeTypes = {
   activity: ActivityNode,
   decision: DecisionNode,
   terminal: TerminalNode,
+};
+
+const edgeTypes = {
+  labeled: LabeledEdge,
 };
 
 function nextLaneOrder(lanes: Lane[]) {
@@ -80,12 +85,40 @@ function FlowchartCanvas({ initialData, onSave }: FlowchartEditorProps) {
     (connection: Connection) => {
       setEdges((eds) =>
         addEdge(
-          { ...connection, type: "smoothstep", markerEnd: { type: MarkerType.ArrowClosed } },
+          { ...connection, type: "labeled", markerEnd: { type: MarkerType.ArrowClosed } },
           eds
         )
       );
     },
     [setEdges]
+  );
+
+  const updateNodeLabel = useCallback(
+    (nodeId: string, label: string) => {
+      setNodes((nds) =>
+        nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, label } } : n))
+      );
+    },
+    [setNodes]
+  );
+
+  const updateEdgeLabel = useCallback(
+    (edgeId: string, label: string) => {
+      setEdges((eds) =>
+        eds.map((e) => (e.id === edgeId ? { ...e, data: { ...e.data, label } } : e))
+      );
+    },
+    [setEdges]
+  );
+
+  const nodesForRender = useMemo(
+    () => nodes.map((n) => ({ ...n, data: { ...n.data, onLabelChange: updateNodeLabel } })),
+    [nodes, updateNodeLabel]
+  );
+
+  const edgesForRender = useMemo(
+    () => edges.map((e) => ({ ...e, data: { ...e.data, onLabelChange: updateEdgeLabel } })),
+    [edges, updateEdgeLabel]
   );
 
   const onNodeDragStop: OnNodeDrag<FlowchartNode> = useCallback(
@@ -205,14 +238,15 @@ function FlowchartCanvas({ initialData, onSave }: FlowchartEditorProps) {
   return (
     <div className="h-full w-full overflow-hidden bg-white">
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={nodesForRender}
+        edges={edgesForRender}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
-        defaultEdgeOptions={{ type: "smoothstep" }}
+        defaultEdgeOptions={{ type: "labeled" }}
         fitView
       >
         <Background />
