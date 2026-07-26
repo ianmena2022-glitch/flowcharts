@@ -16,6 +16,7 @@ export async function saveFlowchart(subprocessId: string, data: FlowchartData) {
       lanes: parsed.lanes as Prisma.InputJsonValue,
       nodes: parsed.nodes as Prisma.InputJsonValue,
       edges: parsed.edges as Prisma.InputJsonValue,
+      orientation: parsed.orientation ?? "horizontal",
     },
   });
 }

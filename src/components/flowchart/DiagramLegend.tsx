@@ -2,27 +2,31 @@
 
 import { ViewportPortal } from "@xyflow/react";
 import { CATEGORY_CONFIG, CATEGORY_ORDER } from "@/lib/flowchart/categories";
-import { LANE_X_START } from "@/lib/flowchart/layout";
-import type { NodeCategory } from "@/lib/flowchart/types";
+import { legendPosition } from "@/lib/flowchart/layout";
+import type { LaneOrientation, NodeCategory } from "@/lib/flowchart/types";
 
 export default function DiagramLegend({
   categoriesInUse,
-  top,
+  mainOffset,
+  orientation,
 }: {
   categoriesInUse: Set<NodeCategory>;
-  top: number;
+  mainOffset: number;
+  orientation: LaneOrientation;
 }) {
   const visible = CATEGORY_ORDER.filter((category) => categoriesInUse.has(category));
 
   if (visible.length === 0) return null;
+
+  const position = legendPosition(mainOffset, orientation);
 
   return (
     <ViewportPortal>
       <div
         style={{
           position: "absolute",
-          left: LANE_X_START,
-          top,
+          left: position.left,
+          top: position.top,
           display: "flex",
           flexWrap: "wrap",
           gap: 12,

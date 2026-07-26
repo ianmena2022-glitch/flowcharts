@@ -10,6 +10,7 @@ export const flowchartDataSchema = z.object({
   lanes: z.array(laneSchema),
   nodes: z.array(z.record(z.string(), z.unknown())),
   edges: z.array(z.record(z.string(), z.unknown())),
+  orientation: z.enum(["horizontal", "vertical"]).optional(),
 });
 
 export type FlowchartDataInput = z.infer<typeof flowchartDataSchema>;

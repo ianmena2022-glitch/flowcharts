@@ -50,5 +50,6 @@ model Flowchart {
   lanes        Json // [{ id, label, order }]
   nodes        Json // React Flow nodes (id, type=category, position, data)
   edges        Json // React Flow edges
+  orientation  String     @default("horizontal") // "horizontal" | "vertical"
   updatedAt    DateTime   @updatedAt
 }

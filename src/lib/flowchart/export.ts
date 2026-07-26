@@ -1,7 +1,7 @@
 import { getNodesBounds, getViewportForBounds } from "@xyflow/react";
 import { toPng } from "html-to-image";
-import { LANE_HEIGHT, LANE_WIDTH, LANE_X_START } from "./layout";
-import type { FlowchartNode, Lane } from "./types";
+import { LANE_THICKNESS, LANE_LENGTH, LANE_CROSS_START } from "./layout";
+import type { FlowchartNode, Lane, LaneOrientation } from "./types";
 
 export const EXPORT_PADDING = 24;
 const LEGEND_RESERVE = 60;
@@ -11,15 +11,29 @@ export type ExportBounds = { x: number; y: number; width: number; height: number
 export function computeExportBounds(
   lanes: Lane[],
   nodes: FlowchartNode[],
-  hasLegend: boolean
+  hasLegend: boolean,
+  orientation: LaneOrientation
 ): ExportBounds {
   const laneCount = Math.max(lanes.length, 1);
-  const laneAreaHeight = laneCount * LANE_HEIGHT + (hasLegend ? LEGEND_RESERVE : 0);
+  const mainSpan = laneCount * LANE_THICKNESS + (hasLegend ? LEGEND_RESERVE : 0);
+  const crossSpan = LANE_LENGTH;
 
-  let minX = LANE_X_START;
-  let minY = 0;
-  let maxX = LANE_X_START + LANE_WIDTH;
-  let maxY = laneAreaHeight;
+  let minX: number;
+  let minY: number;
+  let maxX: number;
+  let maxY: number;
+
+  if (orientation === "horizontal") {
+    minX = LANE_CROSS_START;
+    minY = 0;
+    maxX = LANE_CROSS_START + crossSpan;
+    maxY = mainSpan;
+  } else {
+    minX = 0;
+    minY = LANE_CROSS_START;
+    maxX = mainSpan;
+    maxY = LANE_CROSS_START + crossSpan;
+  }
 
   if (nodes.length > 0) {
     const bounds = getNodesBounds(nodes);

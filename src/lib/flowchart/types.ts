@@ -2,6 +2,8 @@ import type { Node, Edge } from "@xyflow/react";
 
 export type NodeCategory = "approval" | "system" | "decision" | "terminal";
 
+export type LaneOrientation = "horizontal" | "vertical";
+
 export type Lane = {
   id: string;
   label: string;
@@ -21,4 +23,5 @@ export type FlowchartData = {
   lanes: Lane[];
   nodes: FlowchartNode[];
   edges: Edge[];
+  orientation: LaneOrientation;
 };

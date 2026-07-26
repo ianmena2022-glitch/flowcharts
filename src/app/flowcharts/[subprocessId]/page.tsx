@@ -23,6 +23,7 @@ export default async function FlowchartEditorPage({
     lanes: subprocess.flowchart.lanes as unknown as FlowchartData["lanes"],
     nodes: subprocess.flowchart.nodes as unknown as FlowchartData["nodes"],
     edges: subprocess.flowchart.edges as unknown as FlowchartData["edges"],
+    orientation: subprocess.flowchart.orientation as FlowchartData["orientation"],
   };
 
   const handleSave = saveFlowchart.bind(null, subprocessId);

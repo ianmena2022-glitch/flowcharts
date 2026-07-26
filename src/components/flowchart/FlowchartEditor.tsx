@@ -24,7 +24,13 @@ import LabeledEdge from "./edges/LabeledEdge";
 import LaneLayer from "./LaneLayer";
 import DiagramLegend from "./DiagramLegend";
 import { CATEGORY_CONFIG, CATEGORY_ORDER } from "@/lib/flowchart/categories";
-import { LANE_HEIGHT, laneTop, laneCenter } from "@/lib/flowchart/layout";
+import {
+  LANE_THICKNESS,
+  laneIndexAtPoint,
+  clampPointToLane,
+  defaultNodePosition,
+  crossCoord,
+} from "@/lib/flowchart/layout";
 import { flowchartDataSchema } from "@/lib/flowchart/schema";
 import {
   computeExportBounds,
@@ -33,7 +39,13 @@ import {
   downloadBlob,
   slugify,
 } from "@/lib/flowchart/export";
-import type { FlowchartData, FlowchartNode, Lane, NodeCategory } from "@/lib/flowchart/types";
+import type {
+  FlowchartData,
+  FlowchartNode,
+  Lane,
+  LaneOrientation,
+  NodeCategory,
+} from "@/lib/flowchart/types";
 
 const nodeTypes = {
   activity: ActivityNode,
@@ -55,12 +67,6 @@ function sortLanes(lanes: Lane[]) {
 
 function laneIndexById(lanes: Lane[], laneId: string) {
   return sortLanes(lanes).findIndex((l) => l.id === laneId);
-}
-
-function laneAtY(lanes: Lane[], y: number): Lane | undefined {
-  const sorted = sortLanes(lanes);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.floor(y / LANE_HEIGHT)));
-  return sorted[index];
 }
 
 let idCounter = 0;
@@ -85,6 +91,9 @@ export default function FlowchartEditor(props: FlowchartEditorProps) {
 
 function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   const [lanes, setLanes] = useState<Lane[]>(initialData.lanes);
+  const [orientation, setOrientation] = useState<LaneOrientation>(
+    initialData.orientation ?? "horizontal"
+  );
   const [nodes, setNodes, onNodesChange] = useNodesState<FlowchartNode>(initialData.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialData.edges);
   const [saving, setSaving] = useState(false);
@@ -137,23 +146,19 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       setNodes((nds) =>
         nds.map((n) => {
           if (n.id !== draggedNode.id) return n;
-          const lane = laneAtY(lanes, draggedNode.position.y + 20);
+          const laneIndex = laneIndexAtPoint(draggedNode.position, orientation, lanes.length);
+          const lane = sortLanes(lanes)[laneIndex];
           if (!lane) return n;
-          const index = laneIndexById(lanes, lane.id);
-          const top = laneTop(index);
-          const clampedY = Math.min(
-            top + LANE_HEIGHT - 60,
-            Math.max(top + 10, draggedNode.position.y)
-          );
+          const clamped = clampPointToLane(draggedNode.position, laneIndex, orientation);
           return {
             ...n,
-            position: { ...n.position, y: clampedY },
+            position: clamped,
             data: { ...n.data, laneId: lane.id },
           };
         })
       );
     },
-    [lanes, setNodes]
+    [lanes, orientation, setNodes]
   );
 
   const addNode = useCallback(
@@ -167,14 +172,37 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       const newNode: FlowchartNode = {
         id: nextId("node"),
         type: config.shape,
-        position: { x: 60 + countInLane * 40, y: laneCenter(index) - 25 },
+        position: defaultNodePosition(index, orientation, countInLane),
         data: { label: config.label, category, laneId: lane.id },
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [lanes, nodes, setNodes]
+    [lanes, nodes, orientation, setNodes]
   );
+
+  const reflowNodes = useCallback(() => {
+    setNodes((nds) => {
+      const byLane = new Map<string, FlowchartNode[]>();
+      for (const n of nds) {
+        const arr = byLane.get(n.data.laneId) ?? [];
+        arr.push(n);
+        byLane.set(n.data.laneId, arr);
+      }
+
+      return nds.map((n) => {
+        const laneNodes = byLane.get(n.data.laneId);
+        const index = laneIndexById(lanes, n.data.laneId);
+        if (!laneNodes || index === -1) return n;
+
+        const ordinal = [...laneNodes]
+          .sort((a, b) => crossCoord(a.position, orientation) - crossCoord(b.position, orientation))
+          .findIndex((ln) => ln.id === n.id);
+
+        return { ...n, position: defaultNodePosition(index, orientation, ordinal) };
+      });
+    });
+  }, [lanes, orientation, setNodes]);
 
   const addLane = useCallback(() => {
     setLanes((prev) => [
@@ -202,14 +230,14 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
             const index = laneIndexById(reordered, fallbackLaneId);
             return {
               ...n,
-              position: { ...n.position, y: laneCenter(index) - 25 },
+              position: defaultNodePosition(index, orientation, 0),
               data: { ...n.data, laneId: fallbackLaneId },
             };
           })
         );
       }
     },
-    [lanes, setNodes]
+    [lanes, orientation, setNodes]
   );
 
   const moveLane = useCallback((laneId: string, direction: -1 | 1) => {
@@ -239,7 +267,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   async function handleSave() {
     setSaving(true);
     try {
-      await onSave({ lanes, nodes, edges });
+      await onSave({ lanes, nodes, edges, orientation });
       setSavedAt(new Date());
     } finally {
       setSaving(false);
@@ -249,7 +277,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   async function handleExportPng() {
     setExporting("png");
     try {
-      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0);
+      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation);
       const dataUrl = await captureFlowchartPng(bounds);
       downloadDataUrl(dataUrl, `${slugify(title)}.png`);
     } catch {
@@ -262,7 +290,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   async function handleExportPdf() {
     setExporting("pdf");
     try {
-      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0);
+      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation);
       const dataUrl = await captureFlowchartPng(bounds);
       const { jsPDF } = await import("jspdf");
       const width = bounds.width + 48;
@@ -283,7 +311,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
 
   function handleExportJson() {
     downloadBlob(
-      JSON.stringify({ lanes, nodes, edges }, null, 2),
+      JSON.stringify({ lanes, nodes, edges, orientation }, null, 2),
       "application/json",
       `${slugify(title)}.json`
     );
@@ -313,6 +341,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     setLanes(parsed.lanes);
     setNodes(parsed.nodes as FlowchartNode[]);
     setEdges(parsed.edges as Edge[]);
+    setOrientation(parsed.orientation ?? "horizontal");
   }
 
   return (
@@ -330,9 +359,44 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         fitView
       >
         <Background />
-        <LaneLayer lanes={lanes} />
+        <LaneLayer lanes={lanes} orientation={orientation} />
 
         <Panel position="top-left" className="w-64 space-y-2">
+          <div className="rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+            <p className="mb-2 text-xs font-semibold text-slate-500">Orientación</p>
+            <div className="grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                onClick={() => setOrientation("horizontal")}
+                className={`rounded border px-2 py-1 text-xs ${
+                  orientation === "horizontal"
+                    ? "border-slate-500 bg-slate-900 text-white"
+                    : "border-slate-200 text-slate-600"
+                }`}
+              >
+                Horizontal
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrientation("vertical")}
+                className={`rounded border px-2 py-1 text-xs ${
+                  orientation === "vertical"
+                    ? "border-slate-500 bg-slate-900 text-white"
+                    : "border-slate-200 text-slate-600"
+                }`}
+              >
+                Vertical
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={reflowNodes}
+              className="mt-2 w-full rounded border border-slate-300 py-1 text-xs text-slate-600 hover:bg-slate-50"
+            >
+              Reordenar nodos
+            </button>
+          </div>
+
           <div className="rounded-md border border-slate-200 bg-white p-2 shadow-sm">
             <p className="mb-2 text-xs font-semibold text-slate-500">Carriles</p>
             <div className="space-y-1">
@@ -470,7 +534,8 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
 
         <DiagramLegend
           categoriesInUse={categoriesInUse}
-          top={sortedLanes.length * LANE_HEIGHT + 10}
+          mainOffset={sortedLanes.length * LANE_THICKNESS + 10}
+          orientation={orientation}
         />
       </ReactFlow>
     </div>
