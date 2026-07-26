@@ -15,7 +15,7 @@ export default function ActivityNode({
 
   return (
     <div
-      className="flex min-h-[56px] w-[220px] items-center justify-center rounded-lg border-2 px-4 py-3 text-center text-[12px] leading-snug"
+      className="flex min-h-[60px] w-[200px] items-center justify-center rounded-lg border-2 px-3 py-2 text-center text-[11px] leading-snug"
       style={{
         backgroundColor: config.fill,
         borderColor: selected ? "#1e293b" : config.border,

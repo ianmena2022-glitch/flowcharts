@@ -4,6 +4,7 @@ export const laneSchema = z.object({
   id: z.string(),
   label: z.string(),
   order: z.number(),
+  thickness: z.number().optional(),
 });
 
 export const flowchartDataSchema = z.object({

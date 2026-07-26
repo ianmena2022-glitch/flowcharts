@@ -1,27 +1,40 @@
-import type { LaneOrientation } from "./types";
+import type { Lane, LaneOrientation } from "./types";
 
-export const LANE_THICKNESS = 320;
-export const LANE_LENGTH = 2200;
+export const DEFAULT_LANE_THICKNESS = 240;
+export const LANE_LENGTH = 1900;
 export const LANE_CROSS_START = -60;
+export const CROSS_START = 70;
+export const CROSS_STEP = 210;
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
 
-export function laneMainStart(index: number) {
-  return index * LANE_THICKNESS;
+export function laneThickness(lane: Lane) {
+  return lane.thickness ?? DEFAULT_LANE_THICKNESS;
 }
 
-export function laneMainCenter(index: number) {
-  return laneMainStart(index) + LANE_THICKNESS / 2;
+export function totalLanesThickness(sortedLanes: Lane[]) {
+  return sortedLanes.reduce((sum, l) => sum + laneThickness(l), 0);
+}
+
+export function laneMainStart(sortedLanes: Lane[], index: number) {
+  let start = 0;
+  for (let i = 0; i < index; i++) start += laneThickness(sortedLanes[i]);
+  return start;
+}
+
+export function laneMainCenter(sortedLanes: Lane[], index: number) {
+  return laneMainStart(sortedLanes, index) + laneThickness(sortedLanes[index]) / 2;
 }
 
 /** Rectángulo completo de un carril (para dibujar la banda/columna). */
-export function laneRect(index: number, orientation: LaneOrientation): Rect {
-  const mainStart = laneMainStart(index);
+export function laneRect(sortedLanes: Lane[], index: number, orientation: LaneOrientation): Rect {
+  const mainStart = laneMainStart(sortedLanes, index);
+  const thickness = laneThickness(sortedLanes[index]);
   if (orientation === "horizontal") {
-    return { x: LANE_CROSS_START, y: mainStart, width: LANE_LENGTH, height: LANE_THICKNESS };
+    return { x: LANE_CROSS_START, y: mainStart, width: LANE_LENGTH, height: thickness };
   }
-  return { x: mainStart, y: LANE_CROSS_START, width: LANE_THICKNESS, height: LANE_LENGTH };
+  return { x: mainStart, y: LANE_CROSS_START, width: thickness, height: LANE_LENGTH };
 }
 
 /** Coordenada del punto sobre el eje en el que se apilan los carriles. */
@@ -38,32 +51,50 @@ export function crossCoord(point: Point, orientation: LaneOrientation) {
 export function laneIndexAtPoint(
   point: Point,
   orientation: LaneOrientation,
-  laneCount: number
+  sortedLanes: Lane[]
 ) {
-  if (laneCount === 0) return -1;
+  if (sortedLanes.length === 0) return -1;
   const coord = mainCoord(point, orientation);
-  return Math.min(laneCount - 1, Math.max(0, Math.floor(coord / LANE_THICKNESS)));
+  let acc = 0;
+  for (let i = 0; i < sortedLanes.length; i++) {
+    const thickness = laneThickness(sortedLanes[i]);
+    if (coord < acc + thickness || i === sortedLanes.length - 1) return i;
+    acc += thickness;
+  }
+  return sortedLanes.length - 1;
 }
 
 /** Clampea un punto para que su coordenada principal caiga dentro del carril `index`. */
 export function clampPointToLane(
   point: Point,
+  sortedLanes: Lane[],
   index: number,
   orientation: LaneOrientation
 ): Point {
-  const start = laneMainStart(index);
-  const clampedMain = Math.min(start + LANE_THICKNESS - 110, Math.max(start + 20, mainCoord(point, orientation)));
+  const start = laneMainStart(sortedLanes, index);
+  const thickness = laneThickness(sortedLanes[index]);
+  const margin = Math.min(20, thickness / 4);
+  const clampedMain = Math.min(
+    start + thickness - margin - 100,
+    Math.max(start + margin, mainCoord(point, orientation))
+  );
   return orientation === "horizontal" ? { x: point.x, y: clampedMain } : { x: clampedMain, y: point.y };
 }
 
-/** Posición default para un nodo nuevo (o reordenado) según su carril y su orden dentro de él. */
+/**
+ * Posición default para un nodo nuevo (o reordenado) según su carril y su orden dentro de él.
+ * `nodeMainSize` es el ancho del nodo (orientación vertical) o el alto (horizontal), para
+ * centrarlo correctamente dentro del carril sin importar cuán ancho sea éste.
+ */
 export function defaultNodePosition(
+  sortedLanes: Lane[],
   index: number,
   orientation: LaneOrientation,
-  ordinalInLane: number
+  ordinalInLane: number,
+  nodeMainSize: number
 ): Point {
-  const mainCenter = laneMainCenter(index) - 40;
-  const crossOffset = 80 + ordinalInLane * 260;
+  const mainCenter = laneMainCenter(sortedLanes, index) - nodeMainSize / 2;
+  const crossOffset = CROSS_START + ordinalInLane * CROSS_STEP;
   return orientation === "horizontal"
     ? { x: crossOffset, y: mainCenter }
     : { x: mainCenter, y: crossOffset };

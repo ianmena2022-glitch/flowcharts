@@ -23,13 +23,14 @@ import TerminalNode from "./nodes/TerminalNode";
 import LabeledEdge from "./edges/LabeledEdge";
 import LaneLayer from "./LaneLayer";
 import DiagramLegend from "./DiagramLegend";
-import { CATEGORY_CONFIG, CATEGORY_ORDER } from "@/lib/flowchart/categories";
+import { CATEGORY_CONFIG, CATEGORY_ORDER, NODE_WIDTH, NODE_HEIGHT } from "@/lib/flowchart/categories";
 import {
-  LANE_THICKNESS,
+  DEFAULT_LANE_THICKNESS,
   laneIndexAtPoint,
   clampPointToLane,
   defaultNodePosition,
   crossCoord,
+  totalLanesThickness,
 } from "@/lib/flowchart/layout";
 import { flowchartDataSchema } from "@/lib/flowchart/schema";
 import {
@@ -67,6 +68,11 @@ function sortLanes(lanes: Lane[]) {
 
 function laneIndexById(lanes: Lane[], laneId: string) {
   return sortLanes(lanes).findIndex((l) => l.id === laneId);
+}
+
+function nodeMainSizeFor(category: NodeCategory, orientation: LaneOrientation) {
+  const shape = CATEGORY_CONFIG[category].shape;
+  return orientation === "vertical" ? NODE_WIDTH[shape] : NODE_HEIGHT[shape];
 }
 
 let idCounter = 0;
@@ -143,13 +149,14 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
 
   const onNodeDragStop: OnNodeDrag<FlowchartNode> = useCallback(
     (_event, draggedNode) => {
+      const sorted = sortLanes(lanes);
       setNodes((nds) =>
         nds.map((n) => {
           if (n.id !== draggedNode.id) return n;
-          const laneIndex = laneIndexAtPoint(draggedNode.position, orientation, lanes.length);
-          const lane = sortLanes(lanes)[laneIndex];
+          const laneIndex = laneIndexAtPoint(draggedNode.position, orientation, sorted);
+          const lane = sorted[laneIndex];
           if (!lane) return n;
-          const clamped = clampPointToLane(draggedNode.position, laneIndex, orientation);
+          const clamped = clampPointToLane(draggedNode.position, sorted, laneIndex, orientation);
           return {
             ...n,
             position: clamped,
@@ -163,16 +170,18 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
 
   const addNode = useCallback(
     (category: NodeCategory) => {
-      const lane = sortLanes(lanes)[0];
+      const sorted = sortLanes(lanes);
+      const lane = sorted[0];
       if (!lane) return;
       const config = CATEGORY_CONFIG[category];
       const index = laneIndexById(lanes, lane.id);
       const countInLane = nodes.filter((n) => n.data.laneId === lane.id).length;
+      const mainSize = nodeMainSizeFor(category, orientation);
 
       const newNode: FlowchartNode = {
         id: nextId("node"),
         type: config.shape,
-        position: defaultNodePosition(index, orientation, countInLane),
+        position: defaultNodePosition(sorted, index, orientation, countInLane, mainSize),
         data: { label: config.label, category, laneId: lane.id },
       };
 
@@ -182,6 +191,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   );
 
   const reflowNodes = useCallback(() => {
+    const sorted = sortLanes(lanes);
     setNodes((nds) => {
       const byLane = new Map<string, FlowchartNode[]>();
       for (const n of nds) {
@@ -199,7 +209,8 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
           .sort((a, b) => crossCoord(a.position, orientation) - crossCoord(b.position, orientation))
           .findIndex((ln) => ln.id === n.id);
 
-        return { ...n, position: defaultNodePosition(index, orientation, ordinal) };
+        const mainSize = nodeMainSizeFor(n.data.category, orientation);
+        return { ...n, position: defaultNodePosition(sorted, index, orientation, ordinal, mainSize) };
       });
     });
   }, [lanes, orientation, setNodes]);
@@ -215,6 +226,10 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     setLanes((prev) => prev.map((l) => (l.id === laneId ? { ...l, label } : l)));
   }, []);
 
+  const resizeLane = useCallback((laneId: string, thickness: number) => {
+    setLanes((prev) => prev.map((l) => (l.id === laneId ? { ...l, thickness } : l)));
+  }, []);
+
   const removeLane = useCallback(
     (laneId: string) => {
       if (lanes.length <= 1) return;
@@ -228,9 +243,10 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
           nds.map((n) => {
             if (n.data.laneId !== laneId) return n;
             const index = laneIndexById(reordered, fallbackLaneId);
+            const mainSize = nodeMainSizeFor(n.data.category, orientation);
             return {
               ...n,
-              position: defaultNodePosition(index, orientation, 0),
+              position: defaultNodePosition(reordered, index, orientation, 0, mainSize),
               data: { ...n.data, laneId: fallbackLaneId },
             };
           })
@@ -401,36 +417,51 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
             <p className="mb-2 text-xs font-semibold text-slate-500">Carriles</p>
             <div className="space-y-1">
               {sortedLanes.map((lane, index) => (
-                <div key={lane.id} className="flex items-center gap-1">
-                  <input
-                    value={lane.label}
-                    onChange={(e) => renameLane(lane.id, e.target.value)}
-                    className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-slate-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => moveLane(lane.id, -1)}
-                    disabled={index === 0}
-                    className="rounded border border-slate-200 px-1 text-xs text-slate-500 disabled:opacity-30"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveLane(lane.id, 1)}
-                    disabled={index === sortedLanes.length - 1}
-                    className="rounded border border-slate-200 px-1 text-xs text-slate-500 disabled:opacity-30"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeLane(lane.id)}
-                    disabled={sortedLanes.length <= 1}
-                    className="rounded border border-slate-200 px-1 text-xs text-red-500 disabled:opacity-30"
-                  >
-                    ×
-                  </button>
+                <div key={lane.id} className="space-y-1 rounded border border-slate-100 p-1">
+                  <div className="flex items-center gap-1">
+                    <input
+                      value={lane.label}
+                      onChange={(e) => renameLane(lane.id, e.target.value)}
+                      className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-slate-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => moveLane(lane.id, -1)}
+                      disabled={index === 0}
+                      className="rounded border border-slate-200 px-1 text-xs text-slate-500 disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveLane(lane.id, 1)}
+                      disabled={index === sortedLanes.length - 1}
+                      className="rounded border border-slate-200 px-1 text-xs text-slate-500 disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeLane(lane.id)}
+                      disabled={sortedLanes.length <= 1}
+                      className="rounded border border-slate-200 px-1 text-xs text-red-500 disabled:opacity-30"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <span>{orientation === "vertical" ? "Ancho" : "Alto"}</span>
+                    <input
+                      type="number"
+                      min={120}
+                      max={800}
+                      step={10}
+                      value={lane.thickness ?? DEFAULT_LANE_THICKNESS}
+                      onChange={(e) => resizeLane(lane.id, Number(e.target.value) || DEFAULT_LANE_THICKNESS)}
+                      className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-slate-400"
+                    />
+                    <span>px</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -534,7 +565,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
 
         <DiagramLegend
           categoriesInUse={categoriesInUse}
-          mainOffset={sortedLanes.length * LANE_THICKNESS + 10}
+          mainOffset={totalLanesThickness(sortedLanes) + 10}
           orientation={orientation}
         />
       </ReactFlow>

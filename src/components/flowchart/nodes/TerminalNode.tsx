@@ -15,7 +15,7 @@ export default function TerminalNode({
 
   return (
     <div
-      className="flex h-[48px] w-[160px] items-center justify-center rounded-full border-2 px-4 text-center text-[12px]"
+      className="flex h-[46px] w-[150px] items-center justify-center rounded-full border-2 px-3 text-center text-[11px]"
       style={{
         backgroundColor: config.fill,
         borderColor: selected ? "#1e293b" : config.border,

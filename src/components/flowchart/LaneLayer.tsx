@@ -18,7 +18,7 @@ export default function LaneLayer({
     <ViewportPortal>
       <div style={{ position: "absolute", top: 0, left: 0, zIndex: -1 }}>
         {sorted.map((lane, index) => {
-          const rect = laneRect(index, orientation);
+          const rect = laneRect(sorted, index, orientation);
           return (
             <div
               key={lane.id}
@@ -40,6 +40,7 @@ export default function LaneLayer({
                   position: "absolute",
                   left: 8,
                   top: 8,
+                  maxWidth: rect.width - 16,
                   fontSize: 11,
                   fontWeight: 700,
                   color: "#1e293b",
@@ -48,7 +49,8 @@ export default function LaneLayer({
                   borderLeft: "4px solid #475569",
                   borderRadius: 4,
                   padding: "2px 10px",
-                  whiteSpace: "nowrap",
+                  whiteSpace: "normal",
+                  lineHeight: 1.3,
                   boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
                 }}
               >

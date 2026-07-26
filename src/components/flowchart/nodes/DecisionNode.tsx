@@ -15,7 +15,7 @@ export default function DecisionNode({
 
   return (
     <div
-      className="relative flex h-[130px] w-[190px] items-center justify-center text-center text-[11px] leading-snug"
+      className="relative flex h-[110px] w-[170px] items-center justify-center text-center text-[10px] leading-snug"
       style={{
         backgroundColor: config.fill,
         border: `2px solid ${selected ? "#1e293b" : config.border}`,

@@ -8,6 +8,8 @@ export type Lane = {
   id: string;
   label: string;
   order: number;
+  /** Grosor del carril (ancho en vertical, alto en horizontal). Si falta, se usa el default. */
+  thickness?: number;
 };
 
 export type FlowchartNodeData = {

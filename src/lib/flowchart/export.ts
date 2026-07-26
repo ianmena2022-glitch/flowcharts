@@ -1,6 +1,6 @@
 import { getNodesBounds, getViewportForBounds } from "@xyflow/react";
 import { toPng } from "html-to-image";
-import { LANE_THICKNESS, LANE_LENGTH, LANE_CROSS_START } from "./layout";
+import { DEFAULT_LANE_THICKNESS, LANE_LENGTH, LANE_CROSS_START, totalLanesThickness } from "./layout";
 import type { FlowchartNode, Lane, LaneOrientation } from "./types";
 
 export const EXPORT_PADDING = 24;
@@ -14,8 +14,8 @@ export function computeExportBounds(
   hasLegend: boolean,
   orientation: LaneOrientation
 ): ExportBounds {
-  const laneCount = Math.max(lanes.length, 1);
-  const mainSpan = laneCount * LANE_THICKNESS + (hasLegend ? LEGEND_RESERVE : 0);
+  const lanesThickness = lanes.length > 0 ? totalLanesThickness(lanes) : DEFAULT_LANE_THICKNESS;
+  const mainSpan = lanesThickness + (hasLegend ? LEGEND_RESERVE : 0);
   const crossSpan = LANE_LENGTH;
 
   let minX: number;

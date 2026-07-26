@@ -42,3 +42,16 @@ export const CATEGORY_CONFIG: Record<NodeCategory, CategoryConfig> = {
 };
 
 export const CATEGORY_ORDER: NodeCategory[] = ["approval", "system", "decision", "terminal"];
+
+/** Dimensiones reales de cada forma de nodo (deben coincidir con los componentes en components/flowchart/nodes). */
+export const NODE_WIDTH: Record<NodeShape, number> = {
+  activity: 200,
+  decision: 170,
+  terminal: 150,
+};
+
+export const NODE_HEIGHT: Record<NodeShape, number> = {
+  activity: 60,
+  decision: 110,
+  terminal: 46,
+};
