@@ -1,7 +1,7 @@
 import type { LaneOrientation } from "./types";
 
-export const LANE_THICKNESS = 160;
-export const LANE_LENGTH = 1800;
+export const LANE_THICKNESS = 320;
+export const LANE_LENGTH = 2200;
 export const LANE_CROSS_START = -60;
 
 type Point = { x: number; y: number };
@@ -52,7 +52,7 @@ export function clampPointToLane(
   orientation: LaneOrientation
 ): Point {
   const start = laneMainStart(index);
-  const clampedMain = Math.min(start + LANE_THICKNESS - 60, Math.max(start + 10, mainCoord(point, orientation)));
+  const clampedMain = Math.min(start + LANE_THICKNESS - 110, Math.max(start + 20, mainCoord(point, orientation)));
   return orientation === "horizontal" ? { x: point.x, y: clampedMain } : { x: clampedMain, y: point.y };
 }
 
@@ -62,8 +62,8 @@ export function defaultNodePosition(
   orientation: LaneOrientation,
   ordinalInLane: number
 ): Point {
-  const mainCenter = laneMainCenter(index) - 25;
-  const crossOffset = 60 + ordinalInLane * 180;
+  const mainCenter = laneMainCenter(index) - 40;
+  const crossOffset = 80 + ordinalInLane * 260;
   return orientation === "horizontal"
     ? { x: crossOffset, y: mainCenter }
     : { x: mainCenter, y: crossOffset };
