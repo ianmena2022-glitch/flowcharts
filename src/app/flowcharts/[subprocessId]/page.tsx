@@ -14,7 +14,7 @@ export default async function FlowchartEditorPage({
 
   const subprocess = await prisma.subprocess.findUnique({
     where: { id: subprocessId },
-    include: { project: { include: { client: true } }, flowchart: true },
+    include: { folder: true, flowchart: true },
   });
 
   if (!subprocess || !subprocess.flowchart) notFound();
@@ -27,9 +27,7 @@ export default async function FlowchartEditorPage({
 
   const handleSave = saveFlowchart.bind(null, subprocessId);
 
-  const context = [subprocess.project?.client?.name, subprocess.project?.name]
-    .filter(Boolean)
-    .join(" · ");
+  const context = subprocess.folder?.name;
 
   return (
     <div className="flex h-full w-full flex-col">

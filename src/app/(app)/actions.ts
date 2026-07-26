@@ -1,31 +1,37 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
+
+export async function createFolder(formData: FormData) {
+  await requireUser();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
+
+  await prisma.folder.create({ data: { name } });
+  revalidatePath("/");
+}
+
+export async function renameFolder(folderId: string, formData: FormData) {
+  await requireUser();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
+
+  await prisma.folder.update({ where: { id: folderId }, data: { name } });
+  revalidatePath(`/carpetas/${folderId}`);
+  revalidatePath("/");
+}
 
 export async function createFlowchart(formData: FormData) {
   await requireUser();
   const name = String(formData.get("name") ?? "").trim();
-  const clientName = String(formData.get("client") ?? "").trim();
+  const folderId = String(formData.get("folderId") ?? "").trim() || undefined;
   if (!name) return;
 
-  let projectId: string | undefined;
-
-  if (clientName) {
-    const client =
-      (await prisma.client.findFirst({ where: { name: clientName } })) ??
-      (await prisma.client.create({ data: { name: clientName } }));
-
-    const project =
-      (await prisma.project.findFirst({ where: { clientId: client.id } })) ??
-      (await prisma.project.create({ data: { clientId: client.id, name: "General" } }));
-
-    projectId = project.id;
-  }
-
   const subprocess = await prisma.subprocess.create({
-    data: { projectId, name },
+    data: { folderId, name },
   });
 
   await prisma.flowchart.create({
@@ -38,4 +44,10 @@ export async function createFlowchart(formData: FormData) {
   });
 
   redirect(`/flowcharts/${subprocess.id}`);
+}
+
+export async function moveFlowchartToFolder(subprocessId: string, folderId: string | null) {
+  await requireUser();
+  await prisma.subprocess.update({ where: { id: subprocessId }, data: { folderId } });
+  revalidatePath("/");
 }
