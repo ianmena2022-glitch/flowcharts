@@ -1,7 +1,7 @@
 import type { Lane, LaneOrientation } from "./types";
 
 export const DEFAULT_LANE_THICKNESS = 240;
-export const LANE_LENGTH = 1900;
+export const LANE_LENGTH = 2700;
 export const LANE_CROSS_START = -60;
 export const CROSS_START = 70;
 export const CROSS_STEP = 210;
