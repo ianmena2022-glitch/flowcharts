@@ -51,3 +51,26 @@ export async function moveFlowchartToFolder(subprocessId: string, folderId: stri
   await prisma.subprocess.update({ where: { id: subprocessId }, data: { folderId } });
   revalidatePath("/");
 }
+
+export async function renameFlowchart(subprocessId: string, formData: FormData) {
+  await requireUser();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
+
+  const subprocess = await prisma.subprocess.update({
+    where: { id: subprocessId },
+    data: { name },
+  });
+
+  revalidatePath("/");
+  revalidatePath(`/flowcharts/${subprocessId}`);
+  if (subprocess.folderId) revalidatePath(`/carpetas/${subprocess.folderId}`);
+}
+
+export async function deleteFlowchart(subprocessId: string) {
+  await requireUser();
+  const subprocess = await prisma.subprocess.delete({ where: { id: subprocessId } });
+
+  revalidatePath("/");
+  if (subprocess.folderId) revalidatePath(`/carpetas/${subprocess.folderId}`);
+}

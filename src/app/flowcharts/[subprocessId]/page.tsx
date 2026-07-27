@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import FlowchartEditor from "@/components/flowchart/FlowchartEditor";
+import EditableFlowchartTitle from "@/components/EditableFlowchartTitle";
+import DeleteFlowchartButton from "@/components/DeleteFlowchartButton";
 import { saveFlowchart } from "./actions";
 import type { FlowchartData } from "@/lib/flowchart/types";
 
@@ -33,12 +36,17 @@ export default async function FlowchartEditorPage({
   return (
     <div className="flex h-full w-full flex-col">
       <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
-        <Link href="/" className="text-sm text-slate-500 hover:text-slate-900">
-          ← Flowcharts
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-900"
+        >
+          <ArrowLeft size={15} />
+          Flowcharts
         </Link>
         <span className="text-slate-300">|</span>
-        <h1 className="text-sm font-semibold text-slate-900">{subprocess.name}</h1>
+        <EditableFlowchartTitle id={subprocess.id} name={subprocess.name} />
         {context && <span className="text-xs text-slate-400">{context}</span>}
+        <DeleteFlowchartButton id={subprocess.id} name={subprocess.name} />
       </div>
       <div className="flex-1">
         <FlowchartEditor title={subprocess.name} initialData={initialData} onSave={handleSave} />

@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { FolderOpen, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import MoveFolderSelect from "@/components/MoveFolderSelect";
+import FlowchartListItem from "@/components/FlowchartListItem";
 import { createFolder, createFlowchart } from "./actions";
 
 export default async function DashboardPage() {
@@ -18,8 +19,8 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Flowcharts</h1>
-        <p className="text-sm text-slate-500">Documentá y organizá tus procesos.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Flowcharts</h1>
+        <p className="mt-1 text-sm text-slate-500">Documentá y organizá tus procesos.</p>
       </div>
 
       <section className="space-y-3">
@@ -27,31 +28,35 @@ export default async function DashboardPage() {
 
         <form
           action={createFolder}
-          className="flex gap-2 rounded-lg border border-slate-200 bg-white p-4"
+          className="flex gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
         >
           <input
             name="name"
             required
             placeholder="Nombre de la carpeta"
-            className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
+            className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
           />
           <button
             type="submit"
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
           >
+            <Plus size={16} />
             Nueva carpeta
           </button>
         </form>
 
         {folders.length > 0 && (
-          <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+          <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white shadow-sm">
             {folders.map((folder) => (
               <li key={folder.id}>
                 <Link
                   href={`/carpetas/${folder.id}`}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-slate-50"
+                  className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50"
                 >
-                  <span className="text-sm font-medium text-slate-900">📁 {folder.name}</span>
+                  <span className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                    <FolderOpen size={16} className="text-indigo-500" />
+                    {folder.name}
+                  </span>
                   <span className="text-xs text-slate-500">
                     {folder._count.subprocesses} flowchart(s)
                   </span>
@@ -67,18 +72,18 @@ export default async function DashboardPage() {
 
         <form
           action={createFlowchart}
-          className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-4"
+          className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
         >
           <input
             name="name"
             required
             placeholder="Nombre del flowchart"
-            className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
+            className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
           />
           <select
             name="folderId"
             defaultValue=""
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
           >
             <option value="">Sin carpeta</option>
             {folders.map((folder) => (
@@ -89,8 +94,9 @@ export default async function DashboardPage() {
           </select>
           <button
             type="submit"
-            className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
           >
+            <Plus size={16} />
             Crear y abrir
           </button>
         </form>
@@ -99,17 +105,15 @@ export default async function DashboardPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-slate-700">Sin carpeta</h2>
 
-        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+        <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white shadow-sm">
           {ungrouped.map((sp) => (
-            <li key={sp.id} className="flex items-center justify-between px-4 py-3">
-              <Link
-                href={`/flowcharts/${sp.id}`}
-                className="text-sm font-medium text-slate-900 hover:underline"
-              >
-                {sp.name}
-              </Link>
-              <MoveFolderSelect subprocessId={sp.id} currentFolderId={null} folders={folders} />
-            </li>
+            <FlowchartListItem
+              key={sp.id}
+              id={sp.id}
+              name={sp.name}
+              currentFolderId={null}
+              folders={folders}
+            />
           ))}
           {ungrouped.length === 0 && (
             <li className="px-4 py-6 text-center text-sm text-slate-500">

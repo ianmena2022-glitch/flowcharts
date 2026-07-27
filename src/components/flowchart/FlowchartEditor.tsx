@@ -16,6 +16,19 @@ import {
   type OnConnect,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import {
+  ChevronUp,
+  ChevronDown,
+  Download,
+  FileImage,
+  FileJson,
+  FileDown,
+  Plus,
+  RotateCcw,
+  Save,
+  Upload,
+  X,
+} from "lucide-react";
 
 import ActivityNode from "./nodes/ActivityNode";
 import DecisionNode from "./nodes/DecisionNode";
@@ -378,16 +391,16 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         <LaneLayer lanes={lanes} orientation={orientation} />
 
         <Panel position="top-left" className="w-64 space-y-2">
-          <div className="rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+          <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
             <p className="mb-2 text-xs font-semibold text-slate-500">Orientación</p>
             <div className="grid grid-cols-2 gap-1">
               <button
                 type="button"
                 onClick={() => setOrientation("horizontal")}
-                className={`rounded border px-2 py-1 text-xs ${
+                className={`rounded-md border px-2 py-1 text-xs transition-colors ${
                   orientation === "horizontal"
-                    ? "border-slate-500 bg-slate-900 text-white"
-                    : "border-slate-200 text-slate-600"
+                    ? "border-indigo-600 bg-indigo-600 text-white"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 Horizontal
@@ -395,10 +408,10 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
               <button
                 type="button"
                 onClick={() => setOrientation("vertical")}
-                className={`rounded border px-2 py-1 text-xs ${
+                className={`rounded-md border px-2 py-1 text-xs transition-colors ${
                   orientation === "vertical"
-                    ? "border-slate-500 bg-slate-900 text-white"
-                    : "border-slate-200 text-slate-600"
+                    ? "border-indigo-600 bg-indigo-600 text-white"
+                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 Vertical
@@ -407,46 +420,47 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
             <button
               type="button"
               onClick={reflowNodes}
-              className="mt-2 w-full rounded border border-slate-300 py-1 text-xs text-slate-600 hover:bg-slate-50"
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-300 py-1 text-xs text-slate-600 transition-colors hover:bg-slate-50"
             >
+              <RotateCcw size={12} />
               Reordenar nodos
             </button>
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+          <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
             <p className="mb-2 text-xs font-semibold text-slate-500">Carriles</p>
             <div className="space-y-1">
               {sortedLanes.map((lane, index) => (
-                <div key={lane.id} className="space-y-1 rounded border border-slate-100 p-1">
+                <div key={lane.id} className="space-y-1 rounded-md border border-slate-100 p-1">
                   <div className="flex items-center gap-1">
                     <input
                       value={lane.label}
                       onChange={(e) => renameLane(lane.id, e.target.value)}
-                      className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-slate-400"
+                      className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
                     />
                     <button
                       type="button"
                       onClick={() => moveLane(lane.id, -1)}
                       disabled={index === 0}
-                      className="rounded border border-slate-200 px-1 text-xs text-slate-500 disabled:opacity-30"
+                      className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
                     >
-                      ↑
+                      <ChevronUp size={12} />
                     </button>
                     <button
                       type="button"
                       onClick={() => moveLane(lane.id, 1)}
                       disabled={index === sortedLanes.length - 1}
-                      className="rounded border border-slate-200 px-1 text-xs text-slate-500 disabled:opacity-30"
+                      className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
                     >
-                      ↓
+                      <ChevronDown size={12} />
                     </button>
                     <button
                       type="button"
                       onClick={() => removeLane(lane.id)}
                       disabled={sortedLanes.length <= 1}
-                      className="rounded border border-slate-200 px-1 text-xs text-red-500 disabled:opacity-30"
+                      className="rounded border border-slate-200 p-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
                     >
-                      ×
+                      <X size={12} />
                     </button>
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-slate-400">
@@ -458,7 +472,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                       step={10}
                       value={lane.thickness ?? DEFAULT_LANE_THICKNESS}
                       onChange={(e) => resizeLane(lane.id, Number(e.target.value) || DEFAULT_LANE_THICKNESS)}
-                      className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-slate-400"
+                      className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
                     />
                     <span>px</span>
                   </div>
@@ -468,13 +482,14 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
             <button
               type="button"
               onClick={addLane}
-              className="mt-2 w-full rounded border border-dashed border-slate-300 py-1 text-xs text-slate-500 hover:border-slate-400"
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
             >
-              + Agregar carril
+              <Plus size={12} />
+              Agregar carril
             </button>
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+          <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
             <p className="mb-2 text-xs font-semibold text-slate-500">Agregar nodo</p>
             <div className="grid grid-cols-2 gap-1">
               {CATEGORY_ORDER.map((category) => (
@@ -482,7 +497,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                   key={category}
                   type="button"
                   onClick={() => addNode(category)}
-                  className="rounded border px-2 py-1 text-left text-[11px]"
+                  className="rounded-md border px-2 py-1 text-left text-[11px] transition-transform hover:scale-[1.02]"
                   style={{
                     backgroundColor: CATEGORY_CONFIG[category].fill,
                     borderColor: CATEGORY_CONFIG[category].border,
@@ -514,14 +529,16 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
             <button
               type="button"
               onClick={handleImportClick}
-              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
             >
+              <Upload size={15} />
               Importar
             </button>
 
             <div className="relative">
               <details className="group">
-                <summary className="list-none rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                <summary className="flex list-none items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+                  <Download size={15} />
                   Exportar
                 </summary>
                 <div className="absolute right-0 z-10 mt-1 w-36 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
@@ -529,23 +546,26 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                     type="button"
                     onClick={handleExportPng}
                     disabled={exporting !== null}
-                    className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                   >
+                    <FileImage size={14} />
                     {exporting === "png" ? "Exportando..." : "PNG"}
                   </button>
                   <button
                     type="button"
                     onClick={handleExportPdf}
                     disabled={exporting !== null}
-                    className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
                   >
+                    <FileDown size={14} />
                     {exporting === "pdf" ? "Exportando..." : "PDF"}
                   </button>
                   <button
                     type="button"
                     onClick={handleExportJson}
-                    className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                   >
+                    <FileJson size={14} />
                     JSON
                   </button>
                 </div>
@@ -556,8 +576,9 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-500 disabled:opacity-60"
             >
+              <Save size={15} />
               {saving ? "Guardando..." : "Guardar"}
             </button>
           </div>
