@@ -35,10 +35,12 @@ import DecisionNode from "./nodes/DecisionNode";
 import TerminalNode from "./nodes/TerminalNode";
 import LabeledEdge from "./edges/LabeledEdge";
 import LaneLayer from "./LaneLayer";
+import SectionLayer from "./SectionLayer";
 import DiagramLegend from "./DiagramLegend";
 import { CATEGORY_CONFIG, CATEGORY_ORDER, NODE_WIDTH, NODE_HEIGHT } from "@/lib/flowchart/categories";
 import {
   DEFAULT_LANE_THICKNESS,
+  DEFAULT_SECTION_LENGTH,
   laneIndexAtPoint,
   clampPointToLane,
   defaultNodePosition,
@@ -59,6 +61,7 @@ import type {
   Lane,
   LaneOrientation,
   NodeCategory,
+  Section,
 } from "@/lib/flowchart/types";
 
 const nodeTypes = {
@@ -77,6 +80,14 @@ function nextLaneOrder(lanes: Lane[]) {
 
 function sortLanes(lanes: Lane[]) {
   return [...lanes].sort((a, b) => a.order - b.order);
+}
+
+function nextSectionOrder(sections: Section[]) {
+  return sections.length === 0 ? 0 : Math.max(...sections.map((s) => s.order)) + 1;
+}
+
+function sortSections(sections: Section[]) {
+  return [...sections].sort((a, b) => a.order - b.order);
 }
 
 function laneIndexById(lanes: Lane[], laneId: string) {
@@ -110,6 +121,7 @@ export default function FlowchartEditor(props: FlowchartEditorProps) {
 
 function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   const [lanes, setLanes] = useState<Lane[]>(initialData.lanes);
+  const [sections, setSections] = useState<Section[]>(initialData.sections ?? []);
   const [orientation, setOrientation] = useState<LaneOrientation>(
     initialData.orientation ?? "horizontal"
   );
@@ -285,6 +297,44 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     });
   }, []);
 
+  const addSection = useCallback(() => {
+    setSections((prev) => [
+      ...prev,
+      { id: nextId("section"), label: `Subproceso ${prev.length + 1}`, order: nextSectionOrder(prev) },
+    ]);
+  }, []);
+
+  const renameSection = useCallback((sectionId: string, label: string) => {
+    setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, label } : s)));
+  }, []);
+
+  const resizeSection = useCallback((sectionId: string, length: number) => {
+    setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, length } : s)));
+  }, []);
+
+  const removeSection = useCallback((sectionId: string) => {
+    setSections((prev) => {
+      const remaining = sortSections(prev.filter((s) => s.id !== sectionId));
+      return remaining.map((s, i) => ({ ...s, order: i }));
+    });
+  }, []);
+
+  const moveSection = useCallback((sectionId: string, direction: -1 | 1) => {
+    setSections((prev) => {
+      const sorted = sortSections(prev);
+      const index = sorted.findIndex((s) => s.id === sectionId);
+      const swapIndex = index + direction;
+      if (index === -1 || swapIndex < 0 || swapIndex >= sorted.length) return prev;
+      const a = sorted[index];
+      const b = sorted[swapIndex];
+      return prev.map((s) => {
+        if (s.id === a.id) return { ...s, order: b.order };
+        if (s.id === b.id) return { ...s, order: a.order };
+        return s;
+      });
+    });
+  }, []);
+
   const categoriesInUse = useMemo(() => {
     const set = new Set<NodeCategory>();
     nodes.forEach((n) => set.add(n.data.category));
@@ -292,11 +342,12 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   }, [nodes]);
 
   const sortedLanes = useMemo(() => sortLanes(lanes), [lanes]);
+  const sortedSections = useMemo(() => sortSections(sections), [sections]);
 
   async function handleSave() {
     setSaving(true);
     try {
-      await onSave({ lanes, nodes, edges, orientation });
+      await onSave({ lanes, sections, nodes, edges, orientation });
       setSavedAt(new Date());
     } finally {
       setSaving(false);
@@ -306,7 +357,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   async function handleExportPng() {
     setExporting("png");
     try {
-      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation);
+      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation, sections);
       const dataUrl = await captureFlowchartPng(bounds);
       downloadDataUrl(dataUrl, `${slugify(title)}.png`);
     } catch {
@@ -319,7 +370,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   async function handleExportPdf() {
     setExporting("pdf");
     try {
-      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation);
+      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation, sections);
       const dataUrl = await captureFlowchartPng(bounds);
       const { jsPDF } = await import("jspdf");
       const width = bounds.width + 48;
@@ -340,7 +391,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
 
   function handleExportJson() {
     downloadBlob(
-      JSON.stringify({ lanes, nodes, edges, orientation }, null, 2),
+      JSON.stringify({ lanes, sections, nodes, edges, orientation }, null, 2),
       "application/json",
       `${slugify(title)}.json`
     );
@@ -368,6 +419,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     }
 
     setLanes(parsed.lanes);
+    setSections(parsed.sections ?? []);
     setNodes(parsed.nodes as FlowchartNode[]);
     setEdges(parsed.edges as Edge[]);
     setOrientation(parsed.orientation ?? "horizontal");
@@ -389,6 +441,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       >
         <Background />
         <LaneLayer lanes={lanes} orientation={orientation} />
+        <SectionLayer sections={sections} lanes={lanes} orientation={orientation} />
 
         <Panel position="top-left" className="w-64 space-y-2">
           <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
@@ -486,6 +539,67 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
             >
               <Plus size={12} />
               Agregar carril
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
+            <p className="mb-2 text-xs font-semibold text-slate-500">Subprocesos</p>
+            <div className="space-y-1">
+              {sortedSections.map((section, index) => (
+                <div key={section.id} className="space-y-1 rounded-md border border-slate-100 p-1">
+                  <div className="flex items-center gap-1">
+                    <input
+                      value={section.label}
+                      onChange={(e) => renameSection(section.id, e.target.value)}
+                      className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => moveSection(section.id, -1)}
+                      disabled={index === 0}
+                      className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                    >
+                      <ChevronUp size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveSection(section.id, 1)}
+                      disabled={index === sortedSections.length - 1}
+                      className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                    >
+                      <ChevronDown size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeSection(section.id)}
+                      className="rounded border border-slate-200 p-1 text-red-500 hover:bg-red-50"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <span>{orientation === "vertical" ? "Alto" : "Ancho"}</span>
+                    <input
+                      type="number"
+                      min={200}
+                      max={5000}
+                      step={50}
+                      value={section.length ?? DEFAULT_SECTION_LENGTH}
+                      onChange={(e) => resizeSection(section.id, Number(e.target.value) || DEFAULT_SECTION_LENGTH)}
+                      className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                    />
+                    <span>px</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addSection}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
+            >
+              <Plus size={12} />
+              Agregar subproceso
             </button>
           </div>
 

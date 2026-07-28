@@ -14,6 +14,7 @@ export async function saveFlowchart(subprocessId: string, data: FlowchartData) {
     where: { subprocessId },
     data: {
       lanes: parsed.lanes as Prisma.InputJsonValue,
+      sections: (parsed.sections ?? []) as Prisma.InputJsonValue,
       nodes: parsed.nodes as Prisma.InputJsonValue,
       edges: parsed.edges as Prisma.InputJsonValue,
       orientation: parsed.orientation ?? "horizontal",

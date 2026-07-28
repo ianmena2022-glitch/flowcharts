@@ -48,6 +48,7 @@ model Flowchart {
   subprocessId String     @unique
   subprocess   Subprocess @relation(fields: [subprocessId], references: [id], onDelete: Cascade)
   lanes        Json // [{ id, label, order }]
+  sections     Json       @default("[]") // [{ id, label, order, length }] — columnas de subproceso
   nodes        Json // React Flow nodes (id, type=category, position, data)
   edges        Json // React Flow edges
   orientation  String     @default("horizontal") // "horizontal" | "vertical"

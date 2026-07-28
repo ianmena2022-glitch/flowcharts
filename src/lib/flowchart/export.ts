@@ -1,7 +1,13 @@
 import { getNodesBounds, getViewportForBounds } from "@xyflow/react";
 import { toPng } from "html-to-image";
-import { DEFAULT_LANE_THICKNESS, LANE_LENGTH, LANE_CROSS_START, totalLanesThickness } from "./layout";
-import type { FlowchartNode, Lane, LaneOrientation } from "./types";
+import {
+  DEFAULT_LANE_THICKNESS,
+  LANE_LENGTH,
+  LANE_CROSS_START,
+  SECTION_HEADER_RESERVE,
+  totalLanesThickness,
+} from "./layout";
+import type { FlowchartNode, Lane, LaneOrientation, Section } from "./types";
 
 export const EXPORT_PADDING = 24;
 const LEGEND_RESERVE = 60;
@@ -12,11 +18,13 @@ export function computeExportBounds(
   lanes: Lane[],
   nodes: FlowchartNode[],
   hasLegend: boolean,
-  orientation: LaneOrientation
+  orientation: LaneOrientation,
+  sections: Section[] = []
 ): ExportBounds {
   const lanesThickness = lanes.length > 0 ? totalLanesThickness(lanes) : DEFAULT_LANE_THICKNESS;
   const mainSpan = lanesThickness + (hasLegend ? LEGEND_RESERVE : 0);
   const crossSpan = LANE_LENGTH;
+  const sectionReserve = sections.length > 0 ? SECTION_HEADER_RESERVE : 0;
 
   let minX: number;
   let minY: number;
@@ -25,11 +33,11 @@ export function computeExportBounds(
 
   if (orientation === "horizontal") {
     minX = LANE_CROSS_START;
-    minY = 0;
+    minY = -sectionReserve;
     maxX = LANE_CROSS_START + crossSpan;
     maxY = mainSpan;
   } else {
-    minX = 0;
+    minX = -sectionReserve;
     minY = LANE_CROSS_START;
     maxX = mainSpan;
     maxY = LANE_CROSS_START + crossSpan;

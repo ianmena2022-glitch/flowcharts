@@ -1,10 +1,18 @@
-import type { Lane, LaneOrientation } from "./types";
+import type { Lane, LaneOrientation, Section } from "./types";
 
 export const DEFAULT_LANE_THICKNESS = 240;
-export const LANE_LENGTH = 12200;
+export const LANE_LENGTH = 10200;
 export const LANE_CROSS_START = -60;
 export const CROSS_START = 70;
 export const CROSS_STEP = 210;
+
+export const DEFAULT_SECTION_LENGTH = 900;
+const SECTION_HEADER_HEIGHT = 34;
+const SECTION_HEADER_GAP = 16;
+/** Espacio reservado antes del primer carril para la cabecera de los subprocesos. */
+export const SECTION_HEADER_RESERVE = SECTION_HEADER_HEIGHT + SECTION_HEADER_GAP;
+/** Margen entre el borde de un subproceso y el primer nodo que contiene. */
+const SECTION_LEFT_MARGIN = 40;
 
 type Point = { x: number; y: number };
 type Rect = { x: number; y: number; width: number; height: number };
@@ -98,6 +106,49 @@ export function defaultNodePosition(
   return orientation === "horizontal"
     ? { x: crossOffset, y: mainCenter }
     : { x: mainCenter, y: crossOffset };
+}
+
+export function sectionLength(section: Section) {
+  return section.length ?? DEFAULT_SECTION_LENGTH;
+}
+
+export function totalSectionsLength(sortedSections: Section[]) {
+  return sortedSections.reduce((sum, s) => sum + sectionLength(s), 0);
+}
+
+/** Coordenada de inicio (eje de flujo) del subproceso `index`, alineada con `CROSS_START`. */
+export function sectionCrossStart(sortedSections: Section[], index: number) {
+  let start = CROSS_START - SECTION_LEFT_MARGIN;
+  for (let i = 0; i < index; i++) start += sectionLength(sortedSections[i]);
+  return start;
+}
+
+/** Rectángulo completo de un subproceso: franja que atraviesa todos los carriles + su cabecera. */
+export function sectionRect(
+  sortedSections: Section[],
+  index: number,
+  orientation: LaneOrientation,
+  sortedLanes: Lane[]
+): Rect {
+  const crossStart = sectionCrossStart(sortedSections, index);
+  const length = sectionLength(sortedSections[index]);
+  const mainSpan = totalLanesThickness(sortedLanes);
+  return orientation === "horizontal"
+    ? { x: crossStart, y: -SECTION_HEADER_RESERVE, width: length, height: mainSpan + SECTION_HEADER_RESERVE }
+    : { x: -SECTION_HEADER_RESERVE, y: crossStart, width: mainSpan + SECTION_HEADER_RESERVE, height: length };
+}
+
+/** Rectángulo de la cabecera (título) de un subproceso, antes del primer carril. */
+export function sectionHeaderRect(
+  sortedSections: Section[],
+  index: number,
+  orientation: LaneOrientation
+): Rect {
+  const crossStart = sectionCrossStart(sortedSections, index);
+  const length = sectionLength(sortedSections[index]);
+  return orientation === "horizontal"
+    ? { x: crossStart, y: -SECTION_HEADER_RESERVE, width: length, height: SECTION_HEADER_HEIGHT }
+    : { x: -SECTION_HEADER_RESERVE, y: crossStart, width: SECTION_HEADER_HEIGHT, height: length };
 }
 
 /** Posición de la leyenda, ubicada después del último carril sobre el eje principal. */

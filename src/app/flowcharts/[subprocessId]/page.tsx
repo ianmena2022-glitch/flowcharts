@@ -24,6 +24,7 @@ export default async function FlowchartEditorPage({
 
   const initialData: FlowchartData = {
     lanes: subprocess.flowchart.lanes as unknown as FlowchartData["lanes"],
+    sections: subprocess.flowchart.sections as unknown as FlowchartData["sections"],
     nodes: subprocess.flowchart.nodes as unknown as FlowchartData["nodes"],
     edges: subprocess.flowchart.edges as unknown as FlowchartData["edges"],
     orientation: subprocess.flowchart.orientation as FlowchartData["orientation"],
