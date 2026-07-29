@@ -46,6 +46,8 @@ import {
   defaultNodePosition,
   crossCoord,
   totalLanesThickness,
+  sectionCrossStart,
+  sectionLength,
 } from "@/lib/flowchart/layout";
 import { flowchartDataSchema } from "@/lib/flowchart/schema";
 import {
@@ -84,11 +86,14 @@ const EDGE_STROKE_COLOR = "#475569"; // slate-600
 const EDGE_STROKE_WIDTH = 2.25;
 const EDGE_MARKER_SIZE = 22;
 
-// El PDF se arma en varias páginas angostas en vez de una sola gigante: los
-// navegadores no rasterizan un canvas más ancho que ~16000px (el diagrama
-// completo lo supera fácil), y aunque lo hicieran, achicar todo el proceso
-// para que entre en una página lo vuelve ilegible. Cada página repite la
-// columna de carriles a la izquierda para saber qué puesto es cada fila.
+// Si el diagrama entero entra bajo el límite de rasterizado del navegador
+// (~16384px de canvas), el PDF sale en una sola página, tal cual se ve.
+// Si no entra, se parte en una página POR SUBPROCESO (nunca a la mitad de
+// un cuadro), repitiendo la columna de carriles a la izquierda en cada
+// página para saber qué puesto es cada fila. Sin subprocesos definidos, o
+// si un subproceso en sí mismo sigue sin entrar, se cae a franjas de ancho
+// fijo como respaldo.
+const CANVAS_SAFE_LIMIT = 16000;
 const PDF_LABEL_STRIP_WIDTH = 320;
 const PDF_SLICE_SIZE = 2400;
 
@@ -414,10 +419,12 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     try {
       const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation, sections);
       const { jsPDF } = await import("jspdf");
+      type Pdf = InstanceType<typeof jsPDF>;
 
       const isHorizontal = orientation === "horizontal";
       const crossStart = isHorizontal ? bounds.x : bounds.y;
       const crossTotal = isHorizontal ? bounds.width : bounds.height;
+      const crossEnd = crossStart + crossTotal;
       const mainStart = isHorizontal ? bounds.y : bounds.x;
       const mainTotal = isHorizontal ? bounds.height : bounds.width;
 
@@ -426,36 +433,74 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
           ? { x: start, y: mainStart, width: size, height: mainTotal }
           : { x: mainStart, y: start, width: mainTotal, height: size };
 
-      // Franja de carriles, repetida en cada página para saber a qué puesto
-      // corresponde cada fila (las páginas siguientes no vuelven a mostrarla).
+      const addPdfPage = (pdf: Pdf | null, width: number, height: number): Pdf => {
+        const pageOrientation = width > height ? "landscape" : "portrait";
+        if (!pdf) return new jsPDF({ unit: "px", orientation: pageOrientation, format: [width, height] });
+        pdf.addPage([width, height], pageOrientation);
+        return pdf;
+      };
+
+      // Si el diagrama entero entra bajo el límite de rasterizado del
+      // navegador, se exporta tal cual, en una sola página.
+      const wholeWidth = Math.ceil(crossTotal) + EXPORT_PADDING * 2;
+      const wholeHeight = Math.ceil(mainTotal) + EXPORT_PADDING * 2;
+      if (wholeWidth <= CANVAS_SAFE_LIMIT && wholeHeight <= CANVAS_SAFE_LIMIT) {
+        const dataUrl = await captureFlowchartPng(bounds);
+        const pdf = addPdfPage(null, wholeWidth, wholeHeight);
+        pdf.addImage(dataUrl, "PNG", 0, 0, wholeWidth, wholeHeight);
+        pdf.save(`${slugify(title)}.pdf`);
+        return;
+      }
+
+      // No entra: se parte en una página por subproceso (nunca a la mitad
+      // de un cuadro), repitiendo la columna de carriles a la izquierda.
       const labelSize = Math.min(PDF_LABEL_STRIP_WIDTH, crossTotal);
       const labelDataUrl = await captureFlowchartPng(crossBounds(crossStart, labelSize));
       const labelImgW = Math.ceil(labelSize) + EXPORT_PADDING * 2;
       const labelImgH = Math.ceil(mainTotal) + EXPORT_PADDING * 2;
 
-      const contentStart = crossStart + labelSize;
-      const contentTotal = Math.max(0, crossTotal - labelSize);
-      const sliceCount = Math.max(1, Math.ceil(contentTotal / PDF_SLICE_SIZE));
+      const ranges: { start: number; size: number }[] = [];
+      if (sortedSections.length > 0) {
+        sortedSections.forEach((section, i) => {
+          const start = sectionCrossStart(sortedSections, i);
+          const isLast = i === sortedSections.length - 1;
+          const end = isLast ? Math.max(start + sectionLength(section), crossEnd) : start + sectionLength(section);
+          ranges.push({ start, size: end - start });
+        });
+      } else {
+        // Sin subprocesos definidos: se cae a franjas de ancho fijo.
+        const contentStart = crossStart + labelSize;
+        const contentTotal = Math.max(0, crossEnd - contentStart);
+        const count = Math.max(1, Math.ceil(contentTotal / PDF_SLICE_SIZE));
+        for (let i = 0; i < count; i++) {
+          const start = contentStart + i * PDF_SLICE_SIZE;
+          ranges.push({ start, size: Math.min(PDF_SLICE_SIZE, crossEnd - start) });
+        }
+      }
 
-      let pdf: InstanceType<typeof jsPDF> | null = null;
+      // Si un subproceso en sí mismo sigue sin entrar bajo el límite, se
+      // subdivide en franjas más chicas (respaldo, no debería ser común).
+      const maxContentPerPage = Math.max(200, CANVAS_SAFE_LIMIT - labelImgW - EXPORT_PADDING * 2);
+      const finalRanges = ranges.flatMap((range) => {
+        if (Math.ceil(range.size) + EXPORT_PADDING * 2 + labelImgW <= CANVAS_SAFE_LIMIT) return [range];
+        const subCount = Math.ceil(range.size / maxContentPerPage);
+        return Array.from({ length: subCount }, (_, i) => {
+          const start = range.start + i * maxContentPerPage;
+          return { start, size: Math.min(maxContentPerPage, range.start + range.size - start) };
+        });
+      });
 
-      for (let i = 0; i < sliceCount; i++) {
-        const sliceStart = contentStart + i * PDF_SLICE_SIZE;
-        const sliceSize = Math.max(0, Math.min(PDF_SLICE_SIZE, crossStart + crossTotal - sliceStart));
-        const sliceDataUrl = sliceSize > 0 ? await captureFlowchartPng(crossBounds(sliceStart, sliceSize)) : null;
+      let pdf: Pdf | null = null;
+      for (const range of finalRanges) {
+        const sliceSize = Math.max(0, range.size);
+        const sliceDataUrl = sliceSize > 0 ? await captureFlowchartPng(crossBounds(range.start, sliceSize)) : null;
         const sliceImgW = Math.ceil(sliceSize) + EXPORT_PADDING * 2;
         const sliceImgH = labelImgH;
 
         const pageWidth = isHorizontal ? labelImgW + sliceImgW : Math.max(labelImgW, sliceImgW);
         const pageHeight = isHorizontal ? Math.max(labelImgH, sliceImgH) : labelImgH + sliceImgH;
-        const pageOrientation = pageWidth > pageHeight ? "landscape" : "portrait";
 
-        if (!pdf) {
-          pdf = new jsPDF({ unit: "px", orientation: pageOrientation, format: [pageWidth, pageHeight] });
-        } else {
-          pdf.addPage([pageWidth, pageHeight], pageOrientation);
-        }
-
+        pdf = addPdfPage(pdf, pageWidth, pageHeight);
         pdf.addImage(labelDataUrl, "PNG", 0, 0, labelImgW, labelImgH);
         if (sliceDataUrl) {
           const sliceX = isHorizontal ? labelImgW : 0;

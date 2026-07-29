@@ -2,8 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/guards";
+import type { FlowchartDataInput } from "@/lib/flowchart/schema";
 
 export async function createFolder(formData: FormData) {
   await requireUser();
@@ -73,4 +75,35 @@ export async function deleteFlowchart(subprocessId: string) {
 
   revalidatePath("/");
   if (subprocess.folderId) revalidatePath(`/carpetas/${subprocess.folderId}`);
+}
+
+export async function importFolder(
+  folderName: string,
+  items: { name: string; data: FlowchartDataInput }[]
+) {
+  await requireUser();
+  if (items.length === 0) return;
+
+  const folder = await prisma.folder.create({
+    data: { name: folderName.trim() || "Importado" },
+  });
+
+  for (const item of items) {
+    const subprocess = await prisma.subprocess.create({
+      data: { folderId: folder.id, name: item.name },
+    });
+    await prisma.flowchart.create({
+      data: {
+        subprocessId: subprocess.id,
+        lanes: item.data.lanes as Prisma.InputJsonValue,
+        sections: (item.data.sections ?? []) as Prisma.InputJsonValue,
+        nodes: item.data.nodes as Prisma.InputJsonValue,
+        edges: item.data.edges as Prisma.InputJsonValue,
+        orientation: item.data.orientation ?? "horizontal",
+      },
+    });
+  }
+
+  revalidatePath("/");
+  redirect(`/carpetas/${folder.id}`);
 }

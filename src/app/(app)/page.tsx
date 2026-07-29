@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FolderOpen, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import FlowchartListItem from "@/components/FlowchartListItem";
+import ImportFolderButton from "@/components/ImportFolderButton";
 import { createFolder, createFlowchart } from "./actions";
 
 export default async function DashboardPage() {
@@ -26,24 +27,25 @@ export default async function DashboardPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-slate-700">Carpetas</h2>
 
-        <form
-          action={createFolder}
-          className="flex gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-        >
-          <input
-            name="name"
-            required
-            placeholder="Nombre de la carpeta"
-            className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-          />
-          <button
-            type="submit"
-            className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
-          >
-            <Plus size={16} />
-            Nueva carpeta
-          </button>
-        </form>
+        <div className="flex flex-wrap items-start gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <form action={createFolder} className="flex flex-1 gap-2">
+            <input
+              name="name"
+              required
+              placeholder="Nombre de la carpeta"
+              className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            />
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+            >
+              <Plus size={16} />
+              Nueva carpeta
+            </button>
+          </form>
+
+          <ImportFolderButton />
+        </div>
 
         {folders.length > 0 && (
           <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white shadow-sm">
