@@ -47,6 +47,7 @@ import {
   DEFAULT_LANE_THICKNESS,
   DEFAULT_SECTION_LENGTH,
   laneIndexAtPoint,
+  shiftPositionForLaneChange,
   defaultNodePosition,
   crossCoord,
   totalLanesThickness,
@@ -428,54 +429,79 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     setLanes((prev) => prev.map((l) => (l.id === laneId ? { ...l, label } : l)));
   }, []);
 
-  const resizeLane = useCallback((laneId: string, thickness: number) => {
-    setLanes((prev) => prev.map((l) => (l.id === laneId ? { ...l, thickness } : l)));
-  }, []);
+  const resizeLane = useCallback(
+    (laneId: string, thickness: number) => {
+      const oldSorted = sortLanes(lanes);
+      const newLanes = lanes.map((l) => (l.id === laneId ? { ...l, thickness } : l));
+      const newSorted = sortLanes(newLanes);
+      setLanes(newLanes);
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          position: shiftPositionForLaneChange(n.position, n.data.laneId, oldSorted, newSorted, orientation),
+        }))
+      );
+    },
+    [lanes, orientation, setNodes]
+  );
 
   const removeLane = useCallback(
     (laneId: string) => {
       if (lanes.length <= 1) return;
+      const oldSorted = sortLanes(lanes);
       const remaining = sortLanes(lanes.filter((l) => l.id !== laneId));
       const reordered = remaining.map((l, i) => ({ ...l, order: i }));
-      const fallbackLaneId = reordered[0]?.id;
+      const newSorted = sortLanes(reordered);
+      const fallbackLaneId = newSorted[0]?.id;
 
       commitHistory();
       setLanes(reordered);
-      if (fallbackLaneId) {
-        setNodes((nds) =>
-          nds.map((n) => {
-            if (n.data.laneId !== laneId) return n;
+      setNodes((nds) =>
+        nds.map((n) => {
+          if (n.data.laneId === laneId) {
+            if (!fallbackLaneId) return n;
             const index = laneIndexById(reordered, fallbackLaneId);
             return {
               ...n,
               position: defaultNodePosition(reordered, index, orientation, 0, nodeMainSize(n, orientation)),
               data: { ...n.data, laneId: fallbackLaneId },
             };
-          })
-        );
-      }
+          }
+          return {
+            ...n,
+            position: shiftPositionForLaneChange(n.position, n.data.laneId, oldSorted, newSorted, orientation),
+          };
+        })
+      );
     },
     [lanes, orientation, setNodes, commitHistory]
   );
 
   const moveLane = useCallback(
     (laneId: string, direction: -1 | 1) => {
+      const oldSorted = sortLanes(lanes);
+      const index = oldSorted.findIndex((l) => l.id === laneId);
+      const swapIndex = index + direction;
+      if (index === -1 || swapIndex < 0 || swapIndex >= oldSorted.length) return;
+      const a = oldSorted[index];
+      const b = oldSorted[swapIndex];
+
       commitHistory();
-      setLanes((prev) => {
-        const sorted = sortLanes(prev);
-        const index = sorted.findIndex((l) => l.id === laneId);
-        const swapIndex = index + direction;
-        if (index === -1 || swapIndex < 0 || swapIndex >= sorted.length) return prev;
-        const a = sorted[index];
-        const b = sorted[swapIndex];
-        return prev.map((l) => {
-          if (l.id === a.id) return { ...l, order: b.order };
-          if (l.id === b.id) return { ...l, order: a.order };
-          return l;
-        });
+      const newLanes = lanes.map((l) => {
+        if (l.id === a.id) return { ...l, order: b.order };
+        if (l.id === b.id) return { ...l, order: a.order };
+        return l;
       });
+      const newSorted = sortLanes(newLanes);
+      setLanes(newLanes);
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          position: shiftPositionForLaneChange(n.position, n.data.laneId, oldSorted, newSorted, orientation),
+        }))
+      );
     },
-    [commitHistory]
+    [lanes, orientation, setNodes, commitHistory]
   );
 
   const addSection = useCallback(() => {

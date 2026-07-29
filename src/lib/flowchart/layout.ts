@@ -38,6 +38,31 @@ export function laneMainCenter(sortedLanes: Lane[], index: number) {
   return laneMainStart(sortedLanes, index) + laneThickness(sortedLanes[index]) / 2;
 }
 
+/**
+ * Recalcula la posición de un nodo para que "siga" a su carril cuando el
+ * stacking cambia (se borra, se reordena o se redimensiona un carril),
+ * preservando el offset relativo exacto del nodo dentro de su banda —
+ * no lo re-centra, solo lo desplaza lo mismo que se desplazó el carril.
+ * Si el carril ya no existe (se acaba de borrar), devuelve la posición sin
+ * tocar — el llamador debe reasignar ese nodo a otro carril aparte.
+ */
+export function shiftPositionForLaneChange(
+  position: Point,
+  laneId: string,
+  oldSortedLanes: Lane[],
+  newSortedLanes: Lane[],
+  orientation: LaneOrientation
+): Point {
+  const oldIndex = oldSortedLanes.findIndex((l) => l.id === laneId);
+  const newIndex = newSortedLanes.findIndex((l) => l.id === laneId);
+  if (oldIndex === -1 || newIndex === -1) return position;
+  const delta = laneMainStart(newSortedLanes, newIndex) - laneMainStart(oldSortedLanes, oldIndex);
+  if (delta === 0) return position;
+  return orientation === "horizontal"
+    ? { x: position.x, y: position.y + delta }
+    : { x: position.x + delta, y: position.y };
+}
+
 /** Rectángulo completo de un carril (para dibujar la banda/columna). */
 export function laneRect(
   sortedLanes: Lane[],
