@@ -26,6 +26,14 @@ export async function renameFolder(folderId: string, formData: FormData) {
   revalidatePath("/");
 }
 
+export async function deleteFolder(folderId: string) {
+  await requireUser();
+  // Los flowcharts adentro no se borran (onDelete: SetNull en Subprocess.folder),
+  // solo quedan sin carpeta.
+  await prisma.folder.delete({ where: { id: folderId } });
+  revalidatePath("/");
+}
+
 export async function createFlowchart(formData: FormData) {
   await requireUser();
   const name = String(formData.get("name") ?? "").trim();

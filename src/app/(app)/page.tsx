@@ -3,6 +3,7 @@ import { FolderOpen, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import FlowchartListItem from "@/components/FlowchartListItem";
 import ImportFolderButton from "@/components/ImportFolderButton";
+import DeleteFolderButton from "@/components/DeleteFolderButton";
 import { createFolder, createFlowchart } from "./actions";
 
 export default async function DashboardPage() {
@@ -50,10 +51,13 @@ export default async function DashboardPage() {
         {folders.length > 0 && (
           <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white shadow-sm">
             {folders.map((folder) => (
-              <li key={folder.id}>
+              <li
+                key={folder.id}
+                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-slate-50"
+              >
                 <Link
                   href={`/carpetas/${folder.id}`}
-                  className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-slate-50"
+                  className="flex flex-1 items-center justify-between gap-2"
                 >
                   <span className="flex items-center gap-2 text-sm font-medium text-slate-900">
                     <FolderOpen size={16} className="text-indigo-500" />
@@ -63,6 +67,7 @@ export default async function DashboardPage() {
                     {folder._count.subprocesses} flowchart(s)
                   </span>
                 </Link>
+                <DeleteFolderButton id={folder.id} name={folder.name} />
               </li>
             ))}
           </ul>

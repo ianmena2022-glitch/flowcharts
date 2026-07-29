@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Plus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import FlowchartListItem from "@/components/FlowchartListItem";
+import DeleteFolderButton from "@/components/DeleteFolderButton";
 import { createFlowchart, renameFolder } from "../../actions";
 
 export default async function FolderPage({
@@ -34,19 +35,22 @@ export default async function FolderPage({
           <ArrowLeft size={15} />
           Flowcharts
         </Link>
-        <form action={renameFolderForThis} className="mt-2 flex items-center gap-2">
-          <input
-            name="name"
-            defaultValue={folder.name}
-            className="rounded-md border border-transparent px-1 -ml-1 text-2xl font-semibold tracking-tight text-slate-900 outline-none focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
-          />
-          <button
-            type="submit"
-            className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
-          >
-            Guardar nombre
-          </button>
-        </form>
+        <div className="mt-2 flex items-center gap-2">
+          <form action={renameFolderForThis} className="flex items-center gap-2">
+            <input
+              name="name"
+              defaultValue={folder.name}
+              className="rounded-md border border-transparent px-1 -ml-1 text-2xl font-semibold tracking-tight text-slate-900 outline-none focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+            />
+            <button
+              type="submit"
+              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+            >
+              Guardar nombre
+            </button>
+          </form>
+          <DeleteFolderButton id={folder.id} name={folder.name} />
+        </div>
       </div>
 
       <form

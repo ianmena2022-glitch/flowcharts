@@ -1,17 +1,18 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
   Background,
-  Panel,
   addEdge,
   MarkerType,
   useNodesState,
   useEdgesState,
   type Connection,
   type Edge,
+  type NodeChange,
+  type EdgeChange,
   type OnNodeDrag,
   type OnConnect,
 } from "@xyflow/react";
@@ -19,13 +20,17 @@ import "@xyflow/react/dist/style.css";
 import {
   ChevronUp,
   ChevronDown,
+  Columns,
   Download,
   FileImage,
   FileJson,
   FileDown,
   Plus,
+  Redo2,
+  Rows,
   RotateCcw,
   Save,
+  Undo2,
   Upload,
   X,
 } from "lucide-react";
@@ -42,7 +47,6 @@ import {
   DEFAULT_LANE_THICKNESS,
   DEFAULT_SECTION_LENGTH,
   laneIndexAtPoint,
-  clampPointToLane,
   defaultNodePosition,
   crossCoord,
   totalLanesThickness,
@@ -122,6 +126,21 @@ function nodeMainSizeFor(category: NodeCategory, orientation: LaneOrientation) {
   return orientation === "vertical" ? NODE_WIDTH[shape] : NODE_HEIGHT[shape];
 }
 
+/** Como nodeMainSizeFor, pero respeta el ancho/alto que el usuario haya
+ * redimensionado a mano en vez de asumir siempre el tamaño default. */
+function nodeMainSize(node: FlowchartNode, orientation: LaneOrientation) {
+  const custom = orientation === "vertical" ? node.width : node.height;
+  return custom ?? nodeMainSizeFor(node.data.category, orientation);
+}
+
+type Snapshot = {
+  lanes: Lane[];
+  sections: Section[];
+  nodes: FlowchartNode[];
+  edges: Edge[];
+  orientation: LaneOrientation;
+};
+
 let idCounter = 0;
 function nextId(prefix: string) {
   idCounter += 1;
@@ -148,15 +167,94 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   const [orientation, setOrientation] = useState<LaneOrientation>(
     initialData.orientation ?? "horizontal"
   );
-  const [nodes, setNodes, onNodesChange] = useNodesState<FlowchartNode>(initialData.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialData.edges);
+  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<FlowchartNode>(initialData.nodes);
+  const [edges, setEdges, onEdgesChangeRaw] = useEdgesState<Edge>(initialData.edges);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [exporting, setExporting] = useState<"png" | "pdf" | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Historial (Ctrl+Z / Ctrl+Shift+Z): guarda una foto completa ANTES de
+  // cada acción que modifica el diagrama, nunca en cada tecla/frame — un
+  // drag o un resize registra un solo checkpoint (al empezar el gesto), no
+  // uno por pixel movido.
+  const pastRef = useRef<Snapshot[]>([]);
+  const futureRef = useRef<Snapshot[]>([]);
+  const commitScheduledRef = useRef(false);
+  const [historyCounts, setHistoryCounts] = useState({ past: 0, future: 0 });
+
+  const commitHistory = useCallback(() => {
+    if (commitScheduledRef.current) return;
+    commitScheduledRef.current = true;
+    pastRef.current.push({ lanes, sections, nodes, edges, orientation });
+    if (pastRef.current.length > 100) pastRef.current.shift();
+    futureRef.current = [];
+    setHistoryCounts({ past: pastRef.current.length, future: 0 });
+    queueMicrotask(() => {
+      commitScheduledRef.current = false;
+    });
+  }, [lanes, sections, nodes, edges, orientation]);
+
+  const undo = useCallback(() => {
+    const prev = pastRef.current.pop();
+    if (!prev) return;
+    futureRef.current.push({ lanes, sections, nodes, edges, orientation });
+    setLanes(prev.lanes);
+    setSections(prev.sections);
+    setNodes(prev.nodes);
+    setEdges(prev.edges);
+    setOrientation(prev.orientation);
+    setHistoryCounts({ past: pastRef.current.length, future: futureRef.current.length });
+  }, [lanes, sections, nodes, edges, orientation, setNodes, setEdges]);
+
+  const redo = useCallback(() => {
+    const next = futureRef.current.pop();
+    if (!next) return;
+    pastRef.current.push({ lanes, sections, nodes, edges, orientation });
+    setLanes(next.lanes);
+    setSections(next.sections);
+    setNodes(next.nodes);
+    setEdges(next.edges);
+    setOrientation(next.orientation);
+    setHistoryCounts({ past: pastRef.current.length, future: futureRef.current.length });
+  }, [lanes, sections, nodes, edges, orientation, setNodes, setEdges]);
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange<FlowchartNode>[]) => {
+      if (changes.some((c) => c.type === "remove")) commitHistory();
+      onNodesChangeRaw(changes);
+    },
+    [onNodesChangeRaw, commitHistory]
+  );
+
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange<Edge>[]) => {
+      if (changes.some((c) => c.type === "remove")) commitHistory();
+      onEdgesChangeRaw(changes);
+    },
+    [onEdgesChangeRaw, commitHistory]
+  );
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const isEditable =
+        !!target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (isEditable) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod || e.key.toLowerCase() !== "z") return;
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
+
   const onConnect: OnConnect = useCallback(
     (connection: Connection) => {
+      commitHistory();
       setEdges((eds) =>
         addEdge(
           {
@@ -174,30 +272,54 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         )
       );
     },
-    [setEdges]
+    [setEdges, commitHistory]
   );
 
   const updateNodeLabel = useCallback(
     (nodeId: string, label: string) => {
+      commitHistory();
       setNodes((nds) =>
         nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, label } } : n))
+      );
+    },
+    [setNodes, commitHistory]
+  );
+
+  const updateEdgeLabel = useCallback(
+    (edgeId: string, label: string) => {
+      commitHistory();
+      setEdges((eds) =>
+        eds.map((e) => (e.id === edgeId ? { ...e, data: { ...e.data, label } } : e))
+      );
+    },
+    [setEdges, commitHistory]
+  );
+
+  const onNodeResizeStart = useCallback(() => {
+    commitHistory();
+  }, [commitHistory]);
+
+  const onNodeResize = useCallback(
+    (nodeId: string, x: number, y: number, width: number, height: number) => {
+      setNodes((nds) =>
+        nds.map((n) => (n.id === nodeId ? { ...n, position: { x, y }, width, height } : n))
       );
     },
     [setNodes]
   );
 
-  const updateEdgeLabel = useCallback(
-    (edgeId: string, label: string) => {
-      setEdges((eds) =>
-        eds.map((e) => (e.id === edgeId ? { ...e, data: { ...e.data, label } } : e))
-      );
-    },
-    [setEdges]
-  );
-
   const nodesForRender = useMemo(
-    () => nodes.map((n) => ({ ...n, data: { ...n.data, onLabelChange: updateNodeLabel } })),
-    [nodes, updateNodeLabel]
+    () =>
+      nodes.map((n) => ({
+        ...n,
+        data: {
+          ...n.data,
+          onLabelChange: updateNodeLabel,
+          onResizeStart: onNodeResizeStart,
+          onResize: onNodeResize,
+        },
+      })),
+    [nodes, updateNodeLabel, onNodeResizeStart, onNodeResize]
   );
 
   const edgesForRender = useMemo(
@@ -219,6 +341,14 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     [edges, updateEdgeLabel]
   );
 
+  const onNodeDragStart: OnNodeDrag<FlowchartNode> = useCallback(() => {
+    commitHistory();
+  }, [commitHistory]);
+
+  // Sin clamp: el nodo se queda exactamente donde lo soltás, libre dentro
+  // del lienzo. Solo se actualiza de qué carril "es" (metadata para las
+  // bandas/exportación), según la banda sobre la que quedó el centro del
+  // nodo al soltarlo.
   const onNodeDragStop: OnNodeDrag<FlowchartNode> = useCallback(
     (_event, draggedNode) => {
       const sorted = sortLanes(lanes);
@@ -228,12 +358,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
           const laneIndex = laneIndexAtPoint(draggedNode.position, orientation, sorted);
           const lane = sorted[laneIndex];
           if (!lane) return n;
-          const clamped = clampPointToLane(draggedNode.position, sorted, laneIndex, orientation);
-          return {
-            ...n,
-            position: clamped,
-            data: { ...n.data, laneId: lane.id },
-          };
+          return { ...n, data: { ...n.data, laneId: lane.id } };
         })
       );
     },
@@ -257,13 +382,15 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         data: { label: config.label, category, laneId: lane.id },
       };
 
+      commitHistory();
       setNodes((nds) => [...nds, newNode]);
     },
-    [lanes, nodes, orientation, setNodes]
+    [lanes, nodes, orientation, setNodes, commitHistory]
   );
 
   const reflowNodes = useCallback(() => {
     const sorted = sortLanes(lanes);
+    commitHistory();
     setNodes((nds) => {
       const byLane = new Map<string, FlowchartNode[]>();
       for (const n of nds) {
@@ -281,18 +408,21 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
           .sort((a, b) => crossCoord(a.position, orientation) - crossCoord(b.position, orientation))
           .findIndex((ln) => ln.id === n.id);
 
-        const mainSize = nodeMainSizeFor(n.data.category, orientation);
-        return { ...n, position: defaultNodePosition(sorted, index, orientation, ordinal, mainSize) };
+        return {
+          ...n,
+          position: defaultNodePosition(sorted, index, orientation, ordinal, nodeMainSize(n, orientation)),
+        };
       });
     });
-  }, [lanes, orientation, setNodes]);
+  }, [lanes, orientation, setNodes, commitHistory]);
 
   const addLane = useCallback(() => {
+    commitHistory();
     setLanes((prev) => [
       ...prev,
       { id: nextId("lane"), label: `Puesto ${prev.length + 1}`, order: nextLaneOrder(prev) },
     ]);
-  }, []);
+  }, [commitHistory]);
 
   const renameLane = useCallback((laneId: string, label: string) => {
     setLanes((prev) => prev.map((l) => (l.id === laneId ? { ...l, label } : l)));
@@ -309,47 +439,52 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       const reordered = remaining.map((l, i) => ({ ...l, order: i }));
       const fallbackLaneId = reordered[0]?.id;
 
+      commitHistory();
       setLanes(reordered);
       if (fallbackLaneId) {
         setNodes((nds) =>
           nds.map((n) => {
             if (n.data.laneId !== laneId) return n;
             const index = laneIndexById(reordered, fallbackLaneId);
-            const mainSize = nodeMainSizeFor(n.data.category, orientation);
             return {
               ...n,
-              position: defaultNodePosition(reordered, index, orientation, 0, mainSize),
+              position: defaultNodePosition(reordered, index, orientation, 0, nodeMainSize(n, orientation)),
               data: { ...n.data, laneId: fallbackLaneId },
             };
           })
         );
       }
     },
-    [lanes, orientation, setNodes]
+    [lanes, orientation, setNodes, commitHistory]
   );
 
-  const moveLane = useCallback((laneId: string, direction: -1 | 1) => {
-    setLanes((prev) => {
-      const sorted = sortLanes(prev);
-      const index = sorted.findIndex((l) => l.id === laneId);
-      const swapIndex = index + direction;
-      if (index === -1 || swapIndex < 0 || swapIndex >= sorted.length) return prev;
-      const a = sorted[index];
-      const b = sorted[swapIndex];
-      return prev.map((l) => {
-        if (l.id === a.id) return { ...l, order: b.order };
-        if (l.id === b.id) return { ...l, order: a.order };
-        return l;
+  const moveLane = useCallback(
+    (laneId: string, direction: -1 | 1) => {
+      commitHistory();
+      setLanes((prev) => {
+        const sorted = sortLanes(prev);
+        const index = sorted.findIndex((l) => l.id === laneId);
+        const swapIndex = index + direction;
+        if (index === -1 || swapIndex < 0 || swapIndex >= sorted.length) return prev;
+        const a = sorted[index];
+        const b = sorted[swapIndex];
+        return prev.map((l) => {
+          if (l.id === a.id) return { ...l, order: b.order };
+          if (l.id === b.id) return { ...l, order: a.order };
+          return l;
+        });
       });
-    });
-  }, []);
+    },
+    [commitHistory]
+  );
 
   const addSection = useCallback(() => {
+    commitHistory();
     setSections((prev) => [
       ...prev,
       { id: nextId("section"), label: `Subproceso ${prev.length + 1}`, order: nextSectionOrder(prev) },
     ]);
-  }, []);
+  }, [commitHistory]);
 
   const renameSection = useCallback((sectionId: string, label: string) => {
     setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, label } : s)));
@@ -359,14 +494,19 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, length } : s)));
   }, []);
 
-  const removeSection = useCallback((sectionId: string) => {
-    setSections((prev) => {
-      const remaining = sortSections(prev.filter((s) => s.id !== sectionId));
-      return remaining.map((s, i) => ({ ...s, order: i }));
-    });
-  }, []);
+  const removeSection = useCallback(
+    (sectionId: string) => {
+      commitHistory();
+      setSections((prev) => {
+        const remaining = sortSections(prev.filter((s) => s.id !== sectionId));
+        return remaining.map((s, i) => ({ ...s, order: i }));
+      });
+    },
+    [commitHistory]
+  );
 
   const moveSection = useCallback((sectionId: string, direction: -1 | 1) => {
+    commitHistory();
     setSections((prev) => {
       const sorted = sortSections(prev);
       const index = sorted.findIndex((s) => s.id === sectionId);
@@ -380,7 +520,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         return s;
       });
     });
-  }, []);
+  }, [commitHistory]);
 
   const categoriesInUse = useMemo(() => {
     const set = new Set<NodeCategory>();
@@ -546,6 +686,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       return;
     }
 
+    commitHistory();
     setLanes(parsed.lanes);
     setSections(parsed.sections ?? []);
     setNodes(parsed.nodes as FlowchartNode[]);
@@ -553,35 +694,92 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     setOrientation(parsed.orientation ?? "horizontal");
   }
 
-  return (
-    <div className="h-full w-full overflow-hidden bg-white">
-      <ReactFlow
-        nodes={nodesForRender}
-        edges={edgesForRender}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeDragStop={onNodeDragStop}
-        defaultEdgeOptions={{ type: "labeled" }}
-        fitView
-      >
-        <Background />
-        <LaneLayer lanes={lanes} sections={sections} nodes={nodes} orientation={orientation} />
-        <SectionLayer sections={sections} lanes={lanes} orientation={orientation} />
+  const canUndo = historyCounts.past > 0;
+  const canRedo = historyCounts.future > 0;
 
-        <Panel position="top-left" className="w-64 space-y-2">
-          <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
-            <p className="mb-2 text-xs font-semibold text-slate-500">Orientación</p>
-            <div className="grid grid-cols-2 gap-1">
+  return (
+    <div className="flex h-full w-full flex-col overflow-hidden bg-white">
+      <div className="flex flex-wrap items-stretch gap-x-1 gap-y-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+        <RibbonGroup label="Archivo">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <RibbonButton onClick={handleImportClick} icon={<Upload size={15} />}>
+            Importar
+          </RibbonButton>
+          <div className="relative">
+            <details className="group">
+              <summary className="flex h-full list-none cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-white [&::-webkit-details-marker]:hidden">
+                <Download size={15} />
+                Exportar
+              </summary>
+              <div className="absolute left-0 z-10 mt-1 w-36 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+                <button
+                  type="button"
+                  onClick={handleExportPng}
+                  disabled={exporting !== null}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  <FileImage size={14} />
+                  {exporting === "png" ? "Exportando..." : "PNG"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  disabled={exporting !== null}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  <FileDown size={14} />
+                  {exporting === "pdf" ? "Exportando..." : "PDF"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportJson}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <FileJson size={14} />
+                  JSON
+                </button>
+              </div>
+            </details>
+          </div>
+          <RibbonButton onClick={handleSave} disabled={saving} icon={<Save size={15} />} accent>
+            {saving ? "Guardando..." : "Guardar"}
+          </RibbonButton>
+          {savedAt && (
+            <span className="flex items-center px-1 text-[11px] text-slate-400">
+              Guardado {savedAt.toLocaleTimeString()}
+            </span>
+          )}
+        </RibbonGroup>
+
+        <RibbonDivider />
+
+        <RibbonGroup label="Deshacer">
+          <RibbonButton onClick={undo} disabled={!canUndo} icon={<Undo2 size={15} />} title="Ctrl+Z">
+            Deshacer
+          </RibbonButton>
+          <RibbonButton onClick={redo} disabled={!canRedo} icon={<Redo2 size={15} />} title="Ctrl+Shift+Z">
+            Rehacer
+          </RibbonButton>
+        </RibbonGroup>
+
+        <RibbonDivider />
+
+        <RibbonGroup label="Vista">
+          <div className="flex h-full flex-col items-center justify-center gap-1 px-1">
+            <div className="flex gap-0.5">
               <button
                 type="button"
                 onClick={() => setOrientation("horizontal")}
-                className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                className={`rounded px-2 py-1 text-[11px] transition-colors ${
                   orientation === "horizontal"
-                    ? "border-indigo-600 bg-indigo-600 text-white"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-600 hover:bg-white"
                 }`}
               >
                 Horizontal
@@ -589,249 +787,264 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
               <button
                 type="button"
                 onClick={() => setOrientation("vertical")}
-                className={`rounded-md border px-2 py-1 text-xs transition-colors ${
+                className={`rounded px-2 py-1 text-[11px] transition-colors ${
                   orientation === "vertical"
-                    ? "border-indigo-600 bg-indigo-600 text-white"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-600 hover:bg-white"
                 }`}
               >
                 Vertical
               </button>
             </div>
-            <button
-              type="button"
-              onClick={reflowNodes}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-slate-300 py-1 text-xs text-slate-600 transition-colors hover:bg-slate-50"
-            >
-              <RotateCcw size={12} />
-              Reordenar nodos
-            </button>
           </div>
+          <RibbonButton onClick={reflowNodes} icon={<RotateCcw size={15} />}>
+            Reordenar
+          </RibbonButton>
+        </RibbonGroup>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
-            <p className="mb-2 text-xs font-semibold text-slate-500">Carriles</p>
-            <div className="space-y-1">
-              {sortedLanes.map((lane, index) => (
-                <div key={lane.id} className="space-y-1 rounded-md border border-slate-100 p-1">
-                  <div className="flex items-center gap-1">
-                    <input
-                      value={lane.label}
-                      onChange={(e) => renameLane(lane.id, e.target.value)}
-                      className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => moveLane(lane.id, -1)}
-                      disabled={index === 0}
-                      className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
-                    >
-                      <ChevronUp size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveLane(lane.id, 1)}
-                      disabled={index === sortedLanes.length - 1}
-                      className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
-                    >
-                      <ChevronDown size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeLane(lane.id)}
-                      disabled={sortedLanes.length <= 1}
-                      className="rounded border border-slate-200 p-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                    <span>{orientation === "vertical" ? "Ancho" : "Alto"}</span>
-                    <input
-                      type="number"
-                      min={120}
-                      max={800}
-                      step={10}
-                      value={lane.thickness ?? DEFAULT_LANE_THICKNESS}
-                      onChange={(e) => resizeLane(lane.id, Number(e.target.value) || DEFAULT_LANE_THICKNESS)}
-                      className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
-                    />
-                    <span>px</span>
-                  </div>
+        <RibbonDivider />
+
+        <RibbonGroup label="Carriles">
+          <div className="relative">
+            <details className="group">
+              <summary className="flex h-full list-none cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-white [&::-webkit-details-marker]:hidden">
+                <Rows size={15} />
+                Carriles ({sortedLanes.length})
+              </summary>
+              <div className="absolute left-0 z-10 mt-1 w-72 space-y-1 overflow-hidden rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+                <div className="max-h-72 space-y-1 overflow-y-auto">
+                  {sortedLanes.map((lane, index) => (
+                    <div key={lane.id} className="space-y-1 rounded-md border border-slate-100 p-1">
+                      <div className="flex items-center gap-1">
+                        <input
+                          value={lane.label}
+                          onFocus={commitHistory}
+                          onChange={(e) => renameLane(lane.id, e.target.value)}
+                          className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => moveLane(lane.id, -1)}
+                          disabled={index === 0}
+                          className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                        >
+                          <ChevronUp size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveLane(lane.id, 1)}
+                          disabled={index === sortedLanes.length - 1}
+                          className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                        >
+                          <ChevronDown size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeLane(lane.id)}
+                          disabled={sortedLanes.length <= 1}
+                          className="rounded border border-slate-200 p-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                        <span>{orientation === "vertical" ? "Ancho" : "Alto"}</span>
+                        <input
+                          type="number"
+                          min={120}
+                          max={800}
+                          step={10}
+                          value={lane.thickness ?? DEFAULT_LANE_THICKNESS}
+                          onFocus={commitHistory}
+                          onChange={(e) =>
+                            resizeLane(lane.id, Number(e.target.value) || DEFAULT_LANE_THICKNESS)
+                          }
+                          className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                        />
+                        <span>px</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={addLane}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
-            >
-              <Plus size={12} />
-              Agregar carril
-            </button>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
-            <p className="mb-2 text-xs font-semibold text-slate-500">Subprocesos</p>
-            <div className="space-y-1">
-              {sortedSections.map((section, index) => (
-                <div key={section.id} className="space-y-1 rounded-md border border-slate-100 p-1">
-                  <div className="flex items-center gap-1">
-                    <input
-                      value={section.label}
-                      onChange={(e) => renameSection(section.id, e.target.value)}
-                      className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => moveSection(section.id, -1)}
-                      disabled={index === 0}
-                      className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
-                    >
-                      <ChevronUp size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveSection(section.id, 1)}
-                      disabled={index === sortedSections.length - 1}
-                      className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
-                    >
-                      <ChevronDown size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeSection(section.id)}
-                      className="rounded border border-slate-200 p-1 text-red-500 hover:bg-red-50"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                    <span>{orientation === "vertical" ? "Alto" : "Ancho"}</span>
-                    <input
-                      type="number"
-                      min={200}
-                      max={5000}
-                      step={50}
-                      value={section.length ?? DEFAULT_SECTION_LENGTH}
-                      onChange={(e) => resizeSection(section.id, Number(e.target.value) || DEFAULT_SECTION_LENGTH)}
-                      className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
-                    />
-                    <span>px</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={addSection}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
-            >
-              <Plus size={12} />
-              Agregar subproceso
-            </button>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
-            <p className="mb-2 text-xs font-semibold text-slate-500">Agregar nodo</p>
-            <div className="grid grid-cols-2 gap-1">
-              {CATEGORY_ORDER.map((category) => (
                 <button
-                  key={category}
                   type="button"
-                  onClick={() => addNode(category)}
-                  className="rounded-md border px-2 py-1 text-left text-[11px] transition-transform hover:scale-[1.02]"
-                  style={{
-                    backgroundColor: CATEGORY_CONFIG[category].fill,
-                    borderColor: CATEGORY_CONFIG[category].border,
-                    color: CATEGORY_CONFIG[category].text,
-                  }}
+                  onClick={addLane}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
                 >
-                  {CATEGORY_CONFIG[category].label}
+                  <Plus size={12} />
+                  Agregar carril
                 </button>
-              ))}
-            </div>
+              </div>
+            </details>
           </div>
-        </Panel>
+        </RibbonGroup>
 
-        <Panel position="top-right">
-          <div className="flex items-center gap-2">
-            {savedAt && (
-              <span className="text-xs text-slate-400">
-                Guardado {savedAt.toLocaleTimeString()}
-              </span>
-            )}
+        <RibbonDivider />
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={handleImportFile}
-            />
-            <button
-              type="button"
-              onClick={handleImportClick}
-              className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-            >
-              <Upload size={15} />
-              Importar
-            </button>
-
-            <div className="relative">
-              <details className="group">
-                <summary className="flex list-none items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
-                  <Download size={15} />
-                  Exportar
-                </summary>
-                <div className="absolute right-0 z-10 mt-1 w-36 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-                  <button
-                    type="button"
-                    onClick={handleExportPng}
-                    disabled={exporting !== null}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                  >
-                    <FileImage size={14} />
-                    {exporting === "png" ? "Exportando..." : "PNG"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportPdf}
-                    disabled={exporting !== null}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                  >
-                    <FileDown size={14} />
-                    {exporting === "pdf" ? "Exportando..." : "PDF"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportJson}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <FileJson size={14} />
-                    JSON
-                  </button>
+        <RibbonGroup label="Subprocesos">
+          <div className="relative">
+            <details className="group">
+              <summary className="flex h-full list-none cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-white [&::-webkit-details-marker]:hidden">
+                <Columns size={15} />
+                Subprocesos ({sortedSections.length})
+              </summary>
+              <div className="absolute left-0 z-10 mt-1 w-72 space-y-1 overflow-hidden rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+                <div className="max-h-72 space-y-1 overflow-y-auto">
+                  {sortedSections.map((section, index) => (
+                    <div key={section.id} className="space-y-1 rounded-md border border-slate-100 p-1">
+                      <div className="flex items-center gap-1">
+                        <input
+                          value={section.label}
+                          onFocus={commitHistory}
+                          onChange={(e) => renameSection(section.id, e.target.value)}
+                          className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => moveSection(section.id, -1)}
+                          disabled={index === 0}
+                          className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                        >
+                          <ChevronUp size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveSection(section.id, 1)}
+                          disabled={index === sortedSections.length - 1}
+                          className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                        >
+                          <ChevronDown size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeSection(section.id)}
+                          className="rounded border border-slate-200 p-1 text-red-500 hover:bg-red-50"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                        <span>{orientation === "vertical" ? "Alto" : "Ancho"}</span>
+                        <input
+                          type="number"
+                          min={200}
+                          max={5000}
+                          step={50}
+                          value={section.length ?? DEFAULT_SECTION_LENGTH}
+                          onFocus={commitHistory}
+                          onChange={(e) =>
+                            resizeSection(section.id, Number(e.target.value) || DEFAULT_SECTION_LENGTH)
+                          }
+                          className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                        />
+                        <span>px</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </details>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-500 disabled:opacity-60"
-            >
-              <Save size={15} />
-              {saving ? "Guardando..." : "Guardar"}
-            </button>
+                <button
+                  type="button"
+                  onClick={addSection}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
+                >
+                  <Plus size={12} />
+                  Agregar subproceso
+                </button>
+              </div>
+            </details>
           </div>
-        </Panel>
+        </RibbonGroup>
 
-        <DiagramLegend
-          categoriesInUse={categoriesInUse}
-          mainOffset={totalLanesThickness(sortedLanes) + 10}
-          orientation={orientation}
-        />
-      </ReactFlow>
+        <RibbonDivider />
+
+        <RibbonGroup label="Agregar nodo">
+          {CATEGORY_ORDER.map((category) => (
+            <button
+              key={category}
+              type="button"
+              onClick={() => addNode(category)}
+              className="flex h-full items-center justify-center rounded-md border px-2.5 py-1 text-[11px] font-medium transition-transform hover:scale-[1.03]"
+              style={{
+                backgroundColor: CATEGORY_CONFIG[category].fill,
+                borderColor: CATEGORY_CONFIG[category].border,
+                color: CATEGORY_CONFIG[category].text,
+              }}
+            >
+              {CATEGORY_CONFIG[category].label}
+            </button>
+          ))}
+        </RibbonGroup>
+      </div>
+
+      <div className="relative flex-1 overflow-hidden">
+        <ReactFlow
+          nodes={nodesForRender}
+          edges={edgesForRender}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeDragStart={onNodeDragStart}
+          onNodeDragStop={onNodeDragStop}
+          defaultEdgeOptions={{ type: "labeled" }}
+          fitView
+        >
+          <Background />
+          <LaneLayer lanes={lanes} sections={sections} nodes={nodes} orientation={orientation} />
+          <SectionLayer sections={sections} lanes={lanes} orientation={orientation} />
+
+          <DiagramLegend
+            categoriesInUse={categoriesInUse}
+            mainOffset={totalLanesThickness(sortedLanes) + 10}
+            orientation={orientation}
+          />
+        </ReactFlow>
+      </div>
     </div>
+  );
+}
+
+function RibbonGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col items-stretch">
+      <div className="flex flex-1 items-stretch gap-0.5">{children}</div>
+      <p className="mt-1 text-center text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+    </div>
+  );
+}
+
+function RibbonDivider() {
+  return <div className="mx-1 w-px self-stretch bg-slate-200" />;
+}
+
+function RibbonButton({
+  onClick,
+  disabled,
+  icon,
+  title,
+  accent,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  icon: React.ReactNode;
+  title?: string;
+  accent?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`flex h-full flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+        accent ? "bg-indigo-600 text-white hover:bg-indigo-500" : "text-slate-700 hover:bg-white"
+      }`}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
