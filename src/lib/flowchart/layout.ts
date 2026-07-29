@@ -1,10 +1,13 @@
 import type { Lane, LaneOrientation, Section } from "./types";
 
-export const DEFAULT_LANE_THICKNESS = 240;
+export const DEFAULT_LANE_THICKNESS = 180;
+/** Piso mínimo para el largo de los carriles (diagramas chicos o vacíos). */
 export const LANE_LENGTH = 10200;
+/** Aire extra después del último contenido, para que el carril no corte justo al final. */
+const LANE_LENGTH_MARGIN = 400;
 export const LANE_CROSS_START = -60;
-export const CROSS_START = 70;
-export const CROSS_STEP = 210;
+export const CROSS_START = 60;
+export const CROSS_STEP = 190;
 
 export const DEFAULT_SECTION_LENGTH = 900;
 const SECTION_HEADER_HEIGHT = 34;
@@ -36,13 +39,35 @@ export function laneMainCenter(sortedLanes: Lane[], index: number) {
 }
 
 /** Rectángulo completo de un carril (para dibujar la banda/columna). */
-export function laneRect(sortedLanes: Lane[], index: number, orientation: LaneOrientation): Rect {
+export function laneRect(
+  sortedLanes: Lane[],
+  index: number,
+  orientation: LaneOrientation,
+  length: number = LANE_LENGTH
+): Rect {
   const mainStart = laneMainStart(sortedLanes, index);
   const thickness = laneThickness(sortedLanes[index]);
   if (orientation === "horizontal") {
-    return { x: LANE_CROSS_START, y: mainStart, width: LANE_LENGTH, height: thickness };
+    return { x: LANE_CROSS_START, y: mainStart, width: length, height: thickness };
   }
-  return { x: mainStart, y: LANE_CROSS_START, width: thickness, height: LANE_LENGTH };
+  return { x: mainStart, y: LANE_CROSS_START, width: thickness, height: length };
+}
+
+/**
+ * Largo real necesario para que los carriles cubran todo el contenido: el mayor entre
+ * el piso default, la suma de los subprocesos y la posición del nodo más lejano.
+ */
+export function laneLength(
+  sortedSections: Section[],
+  nodes: { position: Point }[],
+  orientation: LaneOrientation
+): number {
+  const fromSections = sortedSections.length > 0 ? totalSectionsLength(sortedSections) : 0;
+  const fromNodes = nodes.reduce(
+    (max, n) => Math.max(max, crossCoord(n.position, orientation)),
+    0
+  );
+  return Math.max(LANE_LENGTH, fromSections, fromNodes + LANE_LENGTH_MARGIN);
 }
 
 /** Coordenada del punto sobre el eje en el que se apilan los carriles. */

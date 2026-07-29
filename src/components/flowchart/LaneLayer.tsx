@@ -1,24 +1,30 @@
 "use client";
 
 import { ViewportPortal } from "@xyflow/react";
-import type { Lane, LaneOrientation } from "@/lib/flowchart/types";
-import { laneRect } from "@/lib/flowchart/layout";
+import type { FlowchartNode, Lane, LaneOrientation, Section } from "@/lib/flowchart/types";
+import { laneLength, laneRect } from "@/lib/flowchart/layout";
 
 export default function LaneLayer({
   lanes,
+  sections,
+  nodes,
   orientation,
 }: {
   lanes: Lane[];
+  sections: Section[];
+  nodes: FlowchartNode[];
   orientation: LaneOrientation;
 }) {
   const sorted = [...lanes].sort((a, b) => a.order - b.order);
+  const sortedSections = [...sections].sort((a, b) => a.order - b.order);
+  const length = laneLength(sortedSections, nodes, orientation);
   const isHorizontal = orientation === "horizontal";
 
   return (
     <ViewportPortal>
       <div style={{ position: "absolute", top: 0, left: 0, zIndex: -1 }}>
         {sorted.map((lane, index) => {
-          const rect = laneRect(sorted, index, orientation);
+          const rect = laneRect(sorted, index, orientation, length);
           return (
             <div
               key={lane.id}

@@ -74,6 +74,14 @@ const edgeTypes = {
   labeled: LabeledEdge,
 };
 
+// Estilo default de los conectores — más oscuro/grueso que el gris pálido
+// que trae React Flow por defecto, para que las flechas se lean bien incluso
+// en diagramas grandes. Se aplica a TODOS los edges al renderizar (import
+// viejo, generados por script, dibujados a mano), no solo a los nuevos.
+const EDGE_STROKE_COLOR = "#475569"; // slate-600
+const EDGE_STROKE_WIDTH = 2.25;
+const EDGE_MARKER_SIZE = 22;
+
 function nextLaneOrder(lanes: Lane[]) {
   return lanes.length === 0 ? 0 : Math.max(...lanes.map((l) => l.order)) + 1;
 }
@@ -136,7 +144,17 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     (connection: Connection) => {
       setEdges((eds) =>
         addEdge(
-          { ...connection, type: "labeled", markerEnd: { type: MarkerType.ArrowClosed } },
+          {
+            ...connection,
+            type: "labeled",
+            style: { stroke: EDGE_STROKE_COLOR, strokeWidth: EDGE_STROKE_WIDTH },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              width: EDGE_MARKER_SIZE,
+              height: EDGE_MARKER_SIZE,
+              color: EDGE_STROKE_COLOR,
+            },
+          },
           eds
         )
       );
@@ -168,7 +186,21 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   );
 
   const edgesForRender = useMemo(
-    () => edges.map((e) => ({ ...e, data: { ...e.data, onLabelChange: updateEdgeLabel } })),
+    () =>
+      edges.map((e) => ({
+        ...e,
+        style: { stroke: EDGE_STROKE_COLOR, strokeWidth: EDGE_STROKE_WIDTH, ...e.style },
+        markerEnd:
+          typeof e.markerEnd === "object" && e.markerEnd
+            ? { width: EDGE_MARKER_SIZE, height: EDGE_MARKER_SIZE, color: EDGE_STROKE_COLOR, ...e.markerEnd }
+            : (e.markerEnd ?? {
+                type: MarkerType.ArrowClosed,
+                width: EDGE_MARKER_SIZE,
+                height: EDGE_MARKER_SIZE,
+                color: EDGE_STROKE_COLOR,
+              }),
+        data: { ...e.data, onLabelChange: updateEdgeLabel },
+      })),
     [edges, updateEdgeLabel]
   );
 
@@ -440,7 +472,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         fitView
       >
         <Background />
-        <LaneLayer lanes={lanes} orientation={orientation} />
+        <LaneLayer lanes={lanes} sections={sections} nodes={nodes} orientation={orientation} />
         <SectionLayer sections={sections} lanes={lanes} orientation={orientation} />
 
         <Panel position="top-left" className="w-64 space-y-2">
