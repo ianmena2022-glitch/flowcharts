@@ -44,7 +44,7 @@ export default function EditableFlowchartTitle({ id, name }: { id: string; name:
             setEditing(false);
           }
         }}
-        className="rounded-md border border-indigo-300 bg-white px-1.5 py-0.5 text-sm font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
+        className="rounded-md border border-violet-500 bg-slate-950 px-1.5 py-0.5 text-sm font-semibold text-slate-100 outline-none focus:ring-2 focus:ring-violet-500/30 disabled:opacity-50"
       />
     );
   }
@@ -53,7 +53,7 @@ export default function EditableFlowchartTitle({ id, name }: { id: string; name:
     <h1
       onDoubleClick={() => setEditing(true)}
       title="Doble click para renombrar"
-      className="cursor-text rounded-md px-1.5 py-0.5 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+      className="cursor-text rounded-md px-1.5 py-0.5 text-sm font-semibold text-slate-100 hover:bg-slate-800"
     >
       {name}
     </h1>

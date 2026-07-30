@@ -30,7 +30,7 @@ export default async function FolderPage({
       <div>
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-900"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-100"
         >
           <ArrowLeft size={15} />
           Flowcharts
@@ -40,11 +40,11 @@ export default async function FolderPage({
             <input
               name="name"
               defaultValue={folder.name}
-              className="rounded-md border border-transparent px-1 -ml-1 text-2xl font-semibold tracking-tight text-slate-900 outline-none focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+              className="rounded-md border border-transparent px-1 -ml-1 text-2xl font-semibold tracking-tight text-slate-100 outline-none focus:border-violet-500 focus:bg-slate-900 focus:ring-2 focus:ring-violet-500/30"
             />
             <button
               type="submit"
-              className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+              className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800"
             >
               Guardar nombre
             </button>
@@ -55,25 +55,25 @@ export default async function FolderPage({
 
       <form
         action={createFlowchart}
-        className="flex gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+        className="flex gap-2 rounded-lg border border-slate-800 bg-slate-900 p-4 shadow-sm"
       >
         <input type="hidden" name="folderId" value={folder.id} />
         <input
           name="name"
           required
           placeholder="Nombre del flowchart"
-          className="min-w-[200px] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+          className="min-w-[200px] flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30"
         />
         <button
           type="submit"
-          className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
+          className="flex items-center gap-1.5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-500"
         >
           <Plus size={16} />
           Crear y abrir
         </button>
       </form>
 
-      <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white shadow-sm">
+      <ul className="divide-y divide-slate-800 rounded-lg border border-slate-800 bg-slate-900 shadow-sm">
         {folder.subprocesses.map((sp) => (
           <FlowchartListItem
             key={sp.id}

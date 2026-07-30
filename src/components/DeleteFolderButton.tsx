@@ -30,7 +30,7 @@ export default function DeleteFolderButton({ id, name }: { id: string; name: str
       onClick={handleDelete}
       disabled={pending}
       title="Eliminar carpeta"
-      className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+      className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
     >
       <Trash2 size={14} />
     </button>

@@ -33,7 +33,7 @@ export default function SectionLayer({
                   top: rect.y,
                   width: rect.width,
                   height: rect.height,
-                  borderLeft: index > 0 ? "2px solid #64748b" : undefined,
+                  borderLeft: index > 0 ? "2px solid #7c3aed" : undefined,
                   pointerEvents: "none",
                 }}
               />
@@ -49,7 +49,7 @@ export default function SectionLayer({
                   paddingLeft: index > 0 ? 12 : 0,
                   fontSize: 14,
                   fontWeight: 700,
-                  color: "#1e293b",
+                  color: "#e2e8f0",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",

@@ -30,10 +30,11 @@ export default function DiagramLegend({
           display: "flex",
           flexWrap: "wrap",
           gap: 12,
-          background: "#ffffff",
-          border: "1px solid #94a3b8",
+          background: "#0f172a",
+          border: "1px solid #334155",
           borderRadius: 6,
           padding: "8px 12px",
+          boxShadow: "0 4px 16px -4px rgba(0,0,0,0.5)",
         }}
       >
         {visible.map((category) => {
@@ -50,7 +51,7 @@ export default function DiagramLegend({
                   border: `1px solid ${config.border}`,
                 }}
               />
-              <span style={{ fontSize: 11, color: "#334155" }}>{config.label}</span>
+              <span style={{ fontSize: 11, color: "#cbd5e1" }}>{config.label}</span>
             </div>
           );
         })}

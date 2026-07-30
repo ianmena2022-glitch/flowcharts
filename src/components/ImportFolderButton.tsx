@@ -72,12 +72,12 @@ export default function ImportFolderButton() {
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={pending}
-        className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
+        className="flex items-center gap-1.5 rounded-md border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-slate-800 disabled:opacity-60"
       >
         <FolderInput size={16} />
         {pending ? "Importando..." : "Importar carpeta"}
       </button>
-      {error && <p className="max-w-sm text-xs text-red-600">{error}</p>}
+      {error && <p className="max-w-sm text-xs text-red-400">{error}</p>}
     </div>
   );
 }

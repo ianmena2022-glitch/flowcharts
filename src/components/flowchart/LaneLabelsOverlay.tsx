@@ -37,7 +37,7 @@ export default function LaneLabelsOverlay({
                 : { top: 0, left: start, width: thicknessPx, height: 40 }
             }
           >
-            <span className="ml-1.5 max-w-full truncate rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 shadow-sm">
+            <span className="ml-1.5 max-w-full truncate rounded border border-slate-700 bg-slate-900/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-300 shadow-sm">
               {lane.label}
             </span>
           </div>

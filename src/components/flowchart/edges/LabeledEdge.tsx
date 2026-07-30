@@ -110,15 +110,15 @@ export default function LabeledEdge({
               }}
               onMouseDown={(e) => e.stopPropagation()}
               style={{ width: Math.max(50, value.length * 7 + 16) }}
-              className="rounded border border-slate-400 bg-white px-1.5 py-0.5 text-[10px] text-slate-900 outline-none"
+              className="rounded border border-violet-500 bg-slate-900 px-1.5 py-0.5 text-[10px] text-slate-100 outline-none"
             />
           ) : (
             <div
               className={
                 data?.label
-                  ? "cursor-text rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[10px] text-slate-700 shadow-sm"
+                  ? "cursor-text rounded border border-slate-600 bg-slate-900 px-1.5 py-0.5 text-[10px] text-slate-200 shadow-sm"
                   : selected
-                    ? "cursor-text rounded border border-dashed border-slate-400 bg-white/90 px-1.5 py-0.5 text-[10px] text-slate-400"
+                    ? "cursor-text rounded border border-dashed border-slate-500 bg-slate-900/90 px-1.5 py-0.5 text-[10px] text-slate-400"
                     : "cursor-text px-1.5 py-0.5 text-[10px] text-transparent"
               }
             >

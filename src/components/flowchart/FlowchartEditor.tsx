@@ -91,11 +91,11 @@ const edgeTypes = {
   labeled: LabeledEdge,
 };
 
-// Estilo default de los conectores — más oscuro/grueso que el gris pálido
-// que trae React Flow por defecto, para que las flechas se lean bien incluso
-// en diagramas grandes. Se aplica a TODOS los edges al renderizar (import
-// viejo, generados por script, dibujados a mano), no solo a los nuevos.
-const EDGE_STROKE_COLOR = "#475569"; // slate-600
+// Estilo default de los conectores — claro y grueso para que se lean bien
+// sobre el lienzo oscuro, sin importar el color del nodo que conectan. Se
+// aplica a TODOS los edges al renderizar (import viejo, generados por
+// script, dibujados a mano), no solo a los nuevos.
+const EDGE_STROKE_COLOR = "#cbd5e1"; // slate-300
 const EDGE_STROKE_WIDTH = 2.25;
 const EDGE_MARKER_SIZE = 22;
 
@@ -775,8 +775,8 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   const canRedo = historyCounts.future > 0;
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-white">
-      <div className="flex flex-wrap items-stretch gap-x-1 gap-y-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-slate-950">
+      <div className="flex flex-wrap items-stretch gap-x-1 gap-y-2 border-b border-slate-800 bg-slate-900 px-3 py-2">
         <RibbonGroup label="Archivo">
           <input
             ref={fileInputRef}
@@ -790,16 +790,16 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
           </RibbonButton>
           <div className="relative">
             <details className="group">
-              <summary className="flex h-full list-none cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-white [&::-webkit-details-marker]:hidden">
+              <summary className="flex h-full list-none cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-300 transition-colors hover:bg-slate-800 [&::-webkit-details-marker]:hidden">
                 <Download size={15} />
                 Exportar
               </summary>
-              <div className="absolute left-0 z-10 mt-1 w-36 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+              <div className="absolute left-0 z-10 mt-1 w-36 overflow-hidden rounded-md border border-slate-700 bg-slate-900 shadow-lg shadow-black/40">
                 <button
                   type="button"
                   onClick={handleExportPng}
                   disabled={exporting !== null}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-60"
                 >
                   <FileImage size={14} />
                   {exporting === "png" ? "Exportando..." : "PNG"}
@@ -808,7 +808,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                   type="button"
                   onClick={handleExportPdf}
                   disabled={exporting !== null}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-60"
                 >
                   <FileDown size={14} />
                   {exporting === "pdf" ? "Exportando..." : "PDF"}
@@ -816,7 +816,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                 <button
                   type="button"
                   onClick={handleExportJson}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800"
                 >
                   <FileJson size={14} />
                   JSON
@@ -828,7 +828,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
             {saving ? "Guardando..." : "Guardar"}
           </RibbonButton>
           {savedAt && (
-            <span className="flex items-center px-1 text-[11px] text-slate-400">
+            <span className="flex items-center px-1 text-[11px] text-slate-500">
               Guardado {savedAt.toLocaleTimeString()}
             </span>
           )}
@@ -855,8 +855,8 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                 onClick={() => setOrientation("horizontal")}
                 className={`rounded px-2 py-1 text-[11px] transition-colors ${
                   orientation === "horizontal"
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-600 hover:bg-white"
+                    ? "bg-violet-600 text-white"
+                    : "text-slate-400 hover:bg-slate-800"
                 }`}
               >
                 Horizontal
@@ -866,8 +866,8 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                 onClick={() => setOrientation("vertical")}
                 className={`rounded px-2 py-1 text-[11px] transition-colors ${
                   orientation === "vertical"
-                    ? "bg-indigo-600 text-white"
-                    : "text-slate-600 hover:bg-white"
+                    ? "bg-violet-600 text-white"
+                    : "text-slate-400 hover:bg-slate-800"
                 }`}
               >
                 Vertical
@@ -884,26 +884,26 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         <RibbonGroup label="Carriles">
           <div className="relative">
             <details className="group">
-              <summary className="flex h-full list-none cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-white [&::-webkit-details-marker]:hidden">
+              <summary className="flex h-full list-none cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-300 transition-colors hover:bg-slate-800 [&::-webkit-details-marker]:hidden">
                 <Rows size={15} />
                 Carriles ({sortedLanes.length})
               </summary>
-              <div className="absolute left-0 z-10 mt-1 w-72 space-y-1 overflow-hidden rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+              <div className="absolute left-0 z-10 mt-1 w-72 space-y-1 overflow-hidden rounded-md border border-slate-700 bg-slate-900 p-2 shadow-lg shadow-black/40">
                 <div className="max-h-72 space-y-1 overflow-y-auto">
                   {sortedLanes.map((lane, index) => (
-                    <div key={lane.id} className="space-y-1 rounded-md border border-slate-100 p-1">
+                    <div key={lane.id} className="space-y-1 rounded-md border border-slate-800 p-1">
                       <div className="flex items-center gap-1">
                         <input
                           value={lane.label}
                           onFocus={commitHistory}
                           onChange={(e) => renameLane(lane.id, e.target.value)}
-                          className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                          className="w-full rounded border border-slate-700 bg-slate-950 px-1.5 py-1 text-xs text-slate-100 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30"
                         />
                         <button
                           type="button"
                           onClick={() => moveLane(lane.id, -1)}
                           disabled={index === 0}
-                          className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                          className="rounded border border-slate-700 p-1 text-slate-400 hover:bg-slate-800 disabled:opacity-30"
                         >
                           <ChevronUp size={12} />
                         </button>
@@ -911,7 +911,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                           type="button"
                           onClick={() => moveLane(lane.id, 1)}
                           disabled={index === sortedLanes.length - 1}
-                          className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                          className="rounded border border-slate-700 p-1 text-slate-400 hover:bg-slate-800 disabled:opacity-30"
                         >
                           <ChevronDown size={12} />
                         </button>
@@ -919,12 +919,12 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                           type="button"
                           onClick={() => removeLane(lane.id)}
                           disabled={sortedLanes.length <= 1}
-                          className="rounded border border-slate-200 p-1 text-red-500 hover:bg-red-50 disabled:opacity-30"
+                          className="rounded border border-slate-700 p-1 text-red-400 hover:bg-red-500/10 disabled:opacity-30"
                         >
                           <X size={12} />
                         </button>
                       </div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                      <div className="flex items-center gap-1 text-[10px] text-slate-500">
                         <span>{orientation === "vertical" ? "Ancho" : "Alto"}</span>
                         <input
                           type="number"
@@ -936,7 +936,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                           onChange={(e) =>
                             resizeLane(lane.id, Number(e.target.value) || DEFAULT_LANE_THICKNESS)
                           }
-                          className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                          className="w-16 rounded border border-slate-700 bg-slate-950 px-1 py-0.5 text-xs text-slate-100 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30"
                         />
                         <span>px</span>
                       </div>
@@ -946,7 +946,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                 <button
                   type="button"
                   onClick={addLane}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-600 py-1 text-xs text-slate-400 transition-colors hover:border-violet-500 hover:text-violet-400"
                 >
                   <Plus size={12} />
                   Agregar carril
@@ -961,26 +961,26 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         <RibbonGroup label="Subprocesos">
           <div className="relative">
             <details className="group">
-              <summary className="flex h-full list-none cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-700 transition-colors hover:bg-white [&::-webkit-details-marker]:hidden">
+              <summary className="flex h-full list-none cursor-pointer flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium text-slate-300 transition-colors hover:bg-slate-800 [&::-webkit-details-marker]:hidden">
                 <Columns size={15} />
                 Subprocesos ({sortedSections.length})
               </summary>
-              <div className="absolute left-0 z-10 mt-1 w-72 space-y-1 overflow-hidden rounded-md border border-slate-200 bg-white p-2 shadow-lg">
+              <div className="absolute left-0 z-10 mt-1 w-72 space-y-1 overflow-hidden rounded-md border border-slate-700 bg-slate-900 p-2 shadow-lg shadow-black/40">
                 <div className="max-h-72 space-y-1 overflow-y-auto">
                   {sortedSections.map((section, index) => (
-                    <div key={section.id} className="space-y-1 rounded-md border border-slate-100 p-1">
+                    <div key={section.id} className="space-y-1 rounded-md border border-slate-800 p-1">
                       <div className="flex items-center gap-1">
                         <input
                           value={section.label}
                           onFocus={commitHistory}
                           onChange={(e) => renameSection(section.id, e.target.value)}
-                          className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                          className="w-full rounded border border-slate-700 bg-slate-950 px-1.5 py-1 text-xs text-slate-100 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30"
                         />
                         <button
                           type="button"
                           onClick={() => moveSection(section.id, -1)}
                           disabled={index === 0}
-                          className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                          className="rounded border border-slate-700 p-1 text-slate-400 hover:bg-slate-800 disabled:opacity-30"
                         >
                           <ChevronUp size={12} />
                         </button>
@@ -988,19 +988,19 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                           type="button"
                           onClick={() => moveSection(section.id, 1)}
                           disabled={index === sortedSections.length - 1}
-                          className="rounded border border-slate-200 p-1 text-slate-500 hover:bg-slate-50 disabled:opacity-30"
+                          className="rounded border border-slate-700 p-1 text-slate-400 hover:bg-slate-800 disabled:opacity-30"
                         >
                           <ChevronDown size={12} />
                         </button>
                         <button
                           type="button"
                           onClick={() => removeSection(section.id)}
-                          className="rounded border border-slate-200 p-1 text-red-500 hover:bg-red-50"
+                          className="rounded border border-slate-700 p-1 text-red-400 hover:bg-red-500/10"
                         >
                           <X size={12} />
                         </button>
                       </div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                      <div className="flex items-center gap-1 text-[10px] text-slate-500">
                         <span>{orientation === "vertical" ? "Alto" : "Ancho"}</span>
                         <input
                           type="number"
@@ -1012,7 +1012,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                           onChange={(e) =>
                             resizeSection(section.id, Number(e.target.value) || DEFAULT_SECTION_LENGTH)
                           }
-                          className="w-16 rounded border border-slate-200 px-1 py-0.5 text-xs text-slate-900 outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500/20"
+                          className="w-16 rounded border border-slate-700 bg-slate-950 px-1 py-0.5 text-xs text-slate-100 outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30"
                         />
                         <span>px</span>
                       </div>
@@ -1022,7 +1022,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
                 <button
                   type="button"
                   onClick={addSection}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-600"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-slate-600 py-1 text-xs text-slate-400 transition-colors hover:border-violet-500 hover:text-violet-400"
                 >
                   <Plus size={12} />
                   Agregar subproceso
@@ -1068,7 +1068,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
           connectionMode={ConnectionMode.Loose}
           fitView
         >
-          <Background />
+          <Background color="#334155" gap={24} />
           <LaneLayer lanes={lanes} sections={sections} nodes={nodes} orientation={orientation} />
           <SectionLayer sections={sections} lanes={lanes} orientation={orientation} />
 
@@ -1088,13 +1088,13 @@ function RibbonGroup({ label, children }: { label: string; children: React.React
   return (
     <div className="flex flex-col items-stretch">
       <div className="flex flex-1 items-stretch gap-0.5">{children}</div>
-      <p className="mt-1 text-center text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-center text-[10px] uppercase tracking-wide text-slate-500">{label}</p>
     </div>
   );
 }
 
 function RibbonDivider() {
-  return <div className="mx-1 w-px self-stretch bg-slate-200" />;
+  return <div className="mx-1 w-px self-stretch bg-slate-800" />;
 }
 
 function RibbonButton({
@@ -1119,7 +1119,9 @@ function RibbonButton({
       disabled={disabled}
       title={title}
       className={`flex h-full flex-col items-center justify-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-        accent ? "bg-indigo-600 text-white hover:bg-indigo-500" : "text-slate-700 hover:bg-white"
+        accent
+          ? "bg-violet-600 text-white shadow-[0_0_12px_-2px_rgba(139,92,246,0.6)] hover:bg-violet-500"
+          : "text-slate-300 hover:bg-slate-800"
       }`}
     >
       {icon}

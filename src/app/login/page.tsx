@@ -34,19 +34,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
-        <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(600px circle at 50% 35%, rgba(139,92,246,0.16), transparent 70%)",
+        }}
+      />
+      <div className="relative w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-8 shadow-xl shadow-black/40">
+        <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-violet-600 text-white shadow-[0_0_20px_-2px_rgba(139,92,246,0.7)]">
           <Workflow size={20} strokeWidth={2.25} />
         </span>
-        <h1 className="mb-1 text-xl font-semibold tracking-tight text-slate-900">Flowcharts</h1>
-        <p className="mb-6 text-sm text-slate-500">
+        <h1 className="mb-1 text-xl font-semibold tracking-tight text-slate-100">Flowcharts</h1>
+        <p className="mb-6 text-sm text-slate-400">
           Iniciá sesión para documentar procesos
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-300">
               Email
             </label>
             <input
@@ -55,12 +62,12 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
+            <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-300">
               Contraseña
             </label>
             <input
@@ -69,16 +76,16 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-400">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
+            className="w-full rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-500 disabled:opacity-60"
           >
             {loading ? "Ingresando..." : "Ingresar"}
           </button>

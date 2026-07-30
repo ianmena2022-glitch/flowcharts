@@ -62,12 +62,12 @@ export default function FlowchartListItem({
             disabled={pending}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && cancelEdit()}
-            className="flex-1 rounded-md border border-indigo-300 bg-white px-2 py-1 text-sm text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="flex-1 rounded-md border border-violet-500 bg-slate-950 px-2 py-1 text-sm text-slate-100 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/30"
           />
           <button
             type="submit"
             disabled={pending}
-            className="rounded-md p-1.5 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50"
+            className="rounded-md p-1.5 text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50"
             title="Guardar"
           >
             <Check size={15} />
@@ -76,7 +76,7 @@ export default function FlowchartListItem({
             type="button"
             onClick={cancelEdit}
             disabled={pending}
-            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 disabled:opacity-50"
+            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-800 disabled:opacity-50"
             title="Cancelar"
           >
             <X size={15} />
@@ -85,7 +85,7 @@ export default function FlowchartListItem({
       ) : (
         <Link
           href={`/flowcharts/${id}`}
-          className="flex-1 truncate text-sm font-medium text-slate-900 transition-colors hover:text-indigo-600"
+          className="flex-1 truncate text-sm font-medium text-slate-100 transition-colors hover:text-violet-400"
         >
           {name}
         </Link>
@@ -96,7 +96,7 @@ export default function FlowchartListItem({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-200"
             title="Renombrar"
           >
             <Pencil size={14} />
@@ -105,7 +105,7 @@ export default function FlowchartListItem({
             type="button"
             onClick={handleDelete}
             disabled={pending}
-            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
             title="Eliminar"
           >
             <Trash2 size={14} />

@@ -32,7 +32,7 @@ export default function MoveFolderSelect({
       defaultValue={currentFolderId ?? ""}
       onChange={handleChange}
       disabled={pending}
-      className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50"
+      className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-300 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30 disabled:opacity-50"
     >
       <option value="">Sin carpeta</option>
       {folders.map((folder) => (

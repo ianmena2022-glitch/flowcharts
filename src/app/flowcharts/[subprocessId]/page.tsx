@@ -36,17 +36,17 @@ export default async function FlowchartEditorPage({
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
+      <div className="flex items-center gap-3 border-b border-slate-800 bg-slate-950 px-4 py-2">
         <Link
           href="/"
-          className="flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-900"
+          className="flex items-center gap-1.5 text-sm text-slate-500 transition-colors hover:text-slate-100"
         >
           <ArrowLeft size={15} />
           Flowcharts
         </Link>
-        <span className="text-slate-300">|</span>
+        <span className="text-slate-700">|</span>
         <EditableFlowchartTitle id={subprocess.id} name={subprocess.name} />
-        {context && <span className="text-xs text-slate-400">{context}</span>}
+        {context && <span className="text-xs text-slate-500">{context}</span>}
         <DeleteFlowchartButton id={subprocess.id} name={subprocess.name} />
       </div>
       <div className="flex-1">

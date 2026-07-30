@@ -34,9 +34,9 @@ export default function LaneLayer({
                 top: rect.y,
                 width: rect.width,
                 height: rect.height,
-                borderBottom: isHorizontal ? "1px solid #e2e8f0" : undefined,
-                borderRight: !isHorizontal ? "1px solid #e2e8f0" : undefined,
-                background: index % 2 === 0 ? "transparent" : "rgba(100, 116, 139, 0.045)",
+                borderBottom: isHorizontal ? "1px solid #1e293b" : undefined,
+                borderRight: !isHorizontal ? "1px solid #1e293b" : undefined,
+                background: index % 2 === 0 ? "transparent" : "rgba(148, 163, 184, 0.05)",
               }}
             />
           );
