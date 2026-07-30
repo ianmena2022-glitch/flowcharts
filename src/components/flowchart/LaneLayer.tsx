@@ -38,25 +38,7 @@ export default function LaneLayer({
                 borderRight: !isHorizontal ? "1px solid #e2e8f0" : undefined,
                 background: index % 2 === 0 ? "transparent" : "rgba(100, 116, 139, 0.045)",
               }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  left: 8,
-                  top: 6,
-                  maxWidth: rect.width - 16,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  letterSpacing: "0.04em",
-                  textTransform: "uppercase",
-                  color: "#94a3b8",
-                  whiteSpace: "normal",
-                  lineHeight: 1.3,
-                }}
-              >
-                {lane.label}
-              </div>
-            </div>
+            />
           );
         })}
       </div>

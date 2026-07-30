@@ -40,9 +40,16 @@ import DecisionNode from "./nodes/DecisionNode";
 import TerminalNode from "./nodes/TerminalNode";
 import LabeledEdge from "./edges/LabeledEdge";
 import LaneLayer from "./LaneLayer";
+import LaneLabelsOverlay from "./LaneLabelsOverlay";
 import SectionLayer from "./SectionLayer";
 import DiagramLegend from "./DiagramLegend";
-import { CATEGORY_CONFIG, CATEGORY_ORDER, NODE_WIDTH, NODE_HEIGHT } from "@/lib/flowchart/categories";
+import {
+  CATEGORY_CONFIG,
+  CATEGORY_ORDER,
+  NODE_WIDTH,
+  NODE_HEIGHT,
+  nodeDimensions,
+} from "@/lib/flowchart/categories";
 import {
   DEFAULT_LANE_THICKNESS,
   DEFAULT_SECTION_LENGTH,
@@ -323,23 +330,66 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     [nodes, updateNodeLabel, onNodeResizeStart, onNodeResize]
   );
 
+  // Reparte los edges que comparten (nodo, lado) a lo largo de ese lado en
+  // vez de que todos salgan/entren del mismo punto — solo para actividad e
+  // inicio/fin (rectángulo/píldora, tienen un lado real); una decisión es
+  // un rombo, cada lado es un solo vértice, no hay dónde repartir.
+  const edgeSlots = useMemo(() => {
+    const nodeById = new Map(nodes.map((n) => [n.id, n]));
+    const canSpread = (nodeId: string) => nodeById.get(nodeId)?.data.category !== "decision";
+
+    const groups = new Map<string, string[]>();
+    function register(nodeId: string, handle: string | null | undefined, edgeId: string) {
+      if (!handle || !canSpread(nodeId)) return;
+      const key = `${nodeId}:${handle}`;
+      const arr = groups.get(key);
+      if (arr) arr.push(edgeId);
+      else groups.set(key, [edgeId]);
+    }
+    for (const e of edges) {
+      register(e.source, e.sourceHandle, e.id);
+      register(e.target, e.targetHandle, e.id);
+    }
+
+    function fraction(nodeId: string, handle: string | null | undefined, edgeId: string) {
+      if (!handle) return 0.5;
+      const arr = groups.get(`${nodeId}:${handle}`);
+      if (!arr) return 0.5;
+      const i = arr.indexOf(edgeId);
+      return (i + 1) / (arr.length + 1);
+    }
+
+    return { nodeById, fraction };
+  }, [edges, nodes]);
+
   const edgesForRender = useMemo(
     () =>
-      edges.map((e) => ({
-        ...e,
-        style: { stroke: EDGE_STROKE_COLOR, strokeWidth: EDGE_STROKE_WIDTH, ...e.style },
-        markerEnd:
-          typeof e.markerEnd === "object" && e.markerEnd
-            ? { width: EDGE_MARKER_SIZE, height: EDGE_MARKER_SIZE, color: EDGE_STROKE_COLOR, ...e.markerEnd }
-            : (e.markerEnd ?? {
-                type: MarkerType.ArrowClosed,
-                width: EDGE_MARKER_SIZE,
-                height: EDGE_MARKER_SIZE,
-                color: EDGE_STROKE_COLOR,
-              }),
-        data: { ...e.data, onLabelChange: updateEdgeLabel },
-      })),
-    [edges, updateEdgeLabel]
+      edges.map((e) => {
+        const sourceNode = edgeSlots.nodeById.get(e.source);
+        const targetNode = edgeSlots.nodeById.get(e.target);
+        return {
+          ...e,
+          style: { stroke: EDGE_STROKE_COLOR, strokeWidth: EDGE_STROKE_WIDTH, ...e.style },
+          markerEnd:
+            typeof e.markerEnd === "object" && e.markerEnd
+              ? { width: EDGE_MARKER_SIZE, height: EDGE_MARKER_SIZE, color: EDGE_STROKE_COLOR, ...e.markerEnd }
+              : (e.markerEnd ?? {
+                  type: MarkerType.ArrowClosed,
+                  width: EDGE_MARKER_SIZE,
+                  height: EDGE_MARKER_SIZE,
+                  color: EDGE_STROKE_COLOR,
+                }),
+          data: {
+            ...e.data,
+            onLabelChange: updateEdgeLabel,
+            sourceRect: sourceNode ? { ...sourceNode.position, ...nodeDimensions(sourceNode) } : null,
+            targetRect: targetNode ? { ...targetNode.position, ...nodeDimensions(targetNode) } : null,
+            sourceFraction: edgeSlots.fraction(e.source, e.sourceHandle, e.id),
+            targetFraction: edgeSlots.fraction(e.target, e.targetHandle, e.id),
+          },
+        };
+      }),
+    [edges, edgeSlots, updateEdgeLabel]
   );
 
   const onNodeDragStart: OnNodeDrag<FlowchartNode> = useCallback(() => {
@@ -1026,6 +1076,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
             orientation={orientation}
           />
         </ReactFlow>
+        <LaneLabelsOverlay lanes={lanes} orientation={orientation} />
       </div>
     </div>
   );

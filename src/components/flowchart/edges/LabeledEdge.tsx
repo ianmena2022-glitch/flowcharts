@@ -5,16 +5,43 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  Position,
   type EdgeProps,
   type Edge,
 } from "@xyflow/react";
 
+type NodeRect = { x: number; y: number; width: number; height: number };
+
 export type LabeledEdgeData = {
   label?: string;
   onLabelChange?: (edgeId: string, label: string) => void;
+  /** Rectángulo real del nodo origen/destino y en qué fracción de su lado
+   * (0-1) engancha este edge en particular — así, cuando varios edges
+   * comparten el mismo lado de un nodo, se reparten en vez de salir todos
+   * del mismo punto. Lo calcula FlowchartEditor, que tiene la lista
+   * completa de edges/nodos. */
+  sourceRect?: NodeRect | null;
+  targetRect?: NodeRect | null;
+  sourceFraction?: number;
+  targetFraction?: number;
 };
 
 export type LabeledEdgeType = Edge<LabeledEdgeData, "labeled">;
+
+function pointOnRect(rect: NodeRect, position: Position, fraction: number) {
+  switch (position) {
+    case Position.Left:
+      return { x: rect.x, y: rect.y + rect.height * fraction };
+    case Position.Right:
+      return { x: rect.x + rect.width, y: rect.y + rect.height * fraction };
+    case Position.Top:
+      return { x: rect.x + rect.width * fraction, y: rect.y };
+    case Position.Bottom:
+      return { x: rect.x + rect.width * fraction, y: rect.y + rect.height };
+    default:
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  }
+}
 
 export default function LabeledEdge({
   id,
@@ -32,12 +59,19 @@ export default function LabeledEdge({
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(data?.label ?? "");
 
+  const source = data?.sourceRect
+    ? pointOnRect(data.sourceRect, sourcePosition, data.sourceFraction ?? 0.5)
+    : { x: sourceX, y: sourceY };
+  const target = data?.targetRect
+    ? pointOnRect(data.targetRect, targetPosition, data.targetFraction ?? 0.5)
+    : { x: targetX, y: targetY };
+
   const [path, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
+    sourceX: source.x,
+    sourceY: source.y,
     sourcePosition,
-    targetX,
-    targetY,
+    targetX: target.x,
+    targetY: target.y,
     targetPosition,
   });
 

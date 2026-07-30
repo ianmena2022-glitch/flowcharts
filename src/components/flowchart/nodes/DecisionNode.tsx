@@ -3,6 +3,7 @@ import { CATEGORY_CONFIG, NODE_WIDTH, NODE_HEIGHT } from "@/lib/flowchart/catego
 import type { FlowchartNodeData } from "@/lib/flowchart/types";
 import EditableLabel from "./EditableLabel";
 import type { NodeResizeHandlers } from "./resize";
+import { POINT_HANDLE_STYLE } from "./handleStyles";
 
 export default function DecisionNode({
   id,
@@ -39,15 +40,25 @@ export default function DecisionNode({
         onResizeStart={() => onResizeStart?.()}
         onResize={(_, params) => onResize?.(id, params.x, params.y, params.width, params.height)}
       />
-      <Handle type="target" position={Position.Left} id="left" style={{ left: 0 }} />
-      <Handle type="target" position={Position.Top} id="top" style={{ top: 0 }} />
+      <Handle type="target" position={Position.Left} id="left" style={{ left: 0, ...POINT_HANDLE_STYLE }} />
+      <Handle type="target" position={Position.Top} id="top" style={{ top: 0, ...POINT_HANDLE_STYLE }} />
       <EditableLabel
         label={data.label}
         onChange={(label) => onLabelChange?.(id, label)}
         className="px-6"
       />
-      <Handle type="source" position={Position.Right} id="right" style={{ right: 0 }} />
-      <Handle type="source" position={Position.Bottom} id="bottom" style={{ bottom: 0 }} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        style={{ right: 0, ...POINT_HANDLE_STYLE }}
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="bottom"
+        style={{ bottom: 0, ...POINT_HANDLE_STYLE }}
+      />
     </div>
   );
 }

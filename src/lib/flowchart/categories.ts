@@ -55,3 +55,18 @@ export const NODE_HEIGHT: Record<NodeShape, number> = {
   decision: 110,
   terminal: 46,
 };
+
+/** Ancho/alto efectivo de un nodo: el propio (si fue redimensionado a mano)
+ * o el default de su forma. React Flow pasa 0 (no null/undefined) antes de
+ * medir por primera vez, por eso `||` en vez de `??`. */
+export function nodeDimensions(node: {
+  width?: number | null;
+  height?: number | null;
+  data: { category: NodeCategory };
+}): { width: number; height: number } {
+  const shape = CATEGORY_CONFIG[node.data.category].shape;
+  return {
+    width: node.width || NODE_WIDTH[shape],
+    height: node.height || NODE_HEIGHT[shape],
+  };
+}
