@@ -40,8 +40,8 @@ export default function DecisionNode({
         onResizeStart={() => onResizeStart?.()}
         onResize={(_, params) => onResize?.(id, params.x, params.y, params.width, params.height)}
       />
-      <Handle type="target" position={Position.Left} id="left" style={{ left: 0, ...POINT_HANDLE_STYLE }} />
-      <Handle type="target" position={Position.Top} id="top" style={{ top: 0, ...POINT_HANDLE_STYLE }} />
+      <Handle type="source" position={Position.Left} id="left" style={{ left: 0, ...POINT_HANDLE_STYLE }} />
+      <Handle type="source" position={Position.Top} id="top" style={{ top: 0, ...POINT_HANDLE_STYLE }} />
       <EditableLabel
         label={data.label}
         onChange={(label) => onLabelChange?.(id, label)}

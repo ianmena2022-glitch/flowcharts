@@ -5,6 +5,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
+  ConnectionMode,
   addEdge,
   MarkerType,
   useNodesState,
@@ -1064,6 +1065,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
           onNodeDragStart={onNodeDragStart}
           onNodeDragStop={onNodeDragStop}
           defaultEdgeOptions={{ type: "labeled" }}
+          connectionMode={ConnectionMode.Loose}
           fitView
         >
           <Background />

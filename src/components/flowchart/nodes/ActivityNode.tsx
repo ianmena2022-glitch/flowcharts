@@ -41,8 +41,11 @@ export default function ActivityNode({
         onResizeStart={() => onResizeStart?.()}
         onResize={(_, params) => onResize?.(id, params.x, params.y, params.width, params.height)}
       />
-      <Handle type="target" position={Position.Left} id="left" style={SIDE_HANDLE_STYLE.left} />
-      <Handle type="target" position={Position.Top} id="top" style={SIDE_HANDLE_STYLE.top} />
+      {/* Los 4 son type="source": así, sin importar de cuál arranque el
+          arrastre, ese nodo queda como origen y la flecha apunta a donde
+          se suelta (con connectionMode="loose" cualquiera puede recibir). */}
+      <Handle type="source" position={Position.Left} id="left" style={SIDE_HANDLE_STYLE.left} />
+      <Handle type="source" position={Position.Top} id="top" style={SIDE_HANDLE_STYLE.top} />
       <EditableLabel label={data.label} onChange={(label) => onLabelChange?.(id, label)} />
       <Handle type="source" position={Position.Right} id="right" style={SIDE_HANDLE_STYLE.right} />
       <Handle type="source" position={Position.Bottom} id="bottom" style={SIDE_HANDLE_STYLE.bottom} />
