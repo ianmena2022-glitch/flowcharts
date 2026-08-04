@@ -200,10 +200,3 @@ export function sectionHeaderRect(
     ? { x: crossStart, y: -SECTION_HEADER_RESERVE, width: length, height: SECTION_HEADER_HEIGHT }
     : { x: -SECTION_HEADER_RESERVE, y: crossStart, width: SECTION_HEADER_HEIGHT, height: length };
 }
-
-/** Posición de la leyenda, ubicada después del último carril sobre el eje principal. */
-export function legendPosition(mainOffset: number, orientation: LaneOrientation) {
-  return orientation === "horizontal"
-    ? { top: mainOffset, left: LANE_CROSS_START }
-    : { top: LANE_CROSS_START, left: mainOffset };
-}

@@ -43,7 +43,6 @@ import LabeledEdge from "./edges/LabeledEdge";
 import LaneLayer from "./LaneLayer";
 import LaneLabelsOverlay from "./LaneLabelsOverlay";
 import SectionLayer from "./SectionLayer";
-import DiagramLegend from "./DiagramLegend";
 import {
   CATEGORY_CONFIG,
   CATEGORY_ORDER,
@@ -58,7 +57,6 @@ import {
   shiftPositionForLaneChange,
   defaultNodePosition,
   crossCoord,
-  totalLanesThickness,
   sectionCrossStart,
   sectionLength,
 } from "@/lib/flowchart/layout";
@@ -67,12 +65,13 @@ import {
   computeExportBounds,
   captureFlowchartPng,
   composeExportHeader,
-  composePageCanvas,
+  composeExportLaneLabels,
   downloadDataUrl,
   downloadBlob,
   slugify,
   EXPORT_PADDING,
   EXPORT_HEADER_HEIGHT,
+  LANE_LABEL_GUTTER,
   type ExportBounds,
 } from "@/lib/flowchart/export";
 import type {
@@ -105,12 +104,11 @@ const EDGE_MARKER_SIZE = 22;
 // Si el diagrama entero entra bajo el límite de rasterizado del navegador
 // (~16384px de canvas), el PDF sale en una sola página, tal cual se ve.
 // Si no entra, se parte en una página POR SUBPROCESO (nunca a la mitad de
-// un cuadro), repitiendo la columna de carriles a la izquierda en cada
-// página para saber qué puesto es cada fila. Sin subprocesos definidos, o
-// si un subproceso en sí mismo sigue sin entrar, se cae a franjas de ancho
-// fijo como respaldo.
+// un cuadro), repitiendo los nombres de carril en cada página para saber
+// qué puesto es cada fila. Sin subprocesos definidos, o si un subproceso
+// en sí mismo sigue sin entrar, se cae a franjas de ancho fijo como
+// respaldo.
 const CANVAS_SAFE_LIMIT = 16000;
-const PDF_LABEL_STRIP_WIDTH = 320;
 const PDF_SLICE_SIZE = 2400;
 
 function nextLaneOrder(lanes: Lane[]) {
@@ -602,12 +600,6 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     });
   }, [commitHistory]);
 
-  const categoriesInUse = useMemo(() => {
-    const set = new Set<NodeCategory>();
-    nodes.forEach((n) => set.add(n.data.category));
-    return set;
-  }, [nodes]);
-
   const sortedLanes = useMemo(() => sortLanes(lanes), [lanes]);
   const sortedSections = useMemo(() => sortSections(sections), [sections]);
 
@@ -624,9 +616,10 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   async function handleExportPng() {
     setExporting("png");
     try {
-      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation, sections);
+      const bounds = computeExportBounds(lanes, nodes, orientation, sections);
       const capture = await captureFlowchartPng(bounds);
-      const headered = await composeExportHeader(capture.dataUrl, capture.width, capture.height, title);
+      const withLabels = await composeExportLaneLabels(capture, bounds, sortedLanes, orientation);
+      const headered = await composeExportHeader(withLabels.dataUrl, withLabels.width, withLabels.height, title);
       downloadDataUrl(headered.dataUrl, `${slugify(title)}.png`);
     } catch {
       window.alert("No se pudo exportar el PNG. Probá de nuevo.");
@@ -638,7 +631,7 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
   async function handleExportPdf() {
     setExporting("pdf");
     try {
-      const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation, sections);
+      const bounds = computeExportBounds(lanes, nodes, orientation, sections);
       const { jsPDF } = await import("jspdf");
       type Pdf = InstanceType<typeof jsPDF>;
 
@@ -661,13 +654,21 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         return pdf;
       };
 
+      // Reserva aproximada para la columna de nombres de carril que se
+      // agrega recién al componer la imagen (no consume ancho del canvas
+      // capturado en sí, así que alcanza con un margen conservador acá).
+      const labelGutterReserve = sortedLanes.length > 0 ? LANE_LABEL_GUTTER + EXPORT_PADDING * 2 : 0;
+
       // Si el diagrama entero entra bajo el límite de rasterizado del
       // navegador, se exporta tal cual, en una sola página.
       const wholeWidth = Math.ceil(crossTotal) + EXPORT_PADDING * 2;
       const wholeHeight = Math.ceil(mainTotal) + EXPORT_PADDING * 2;
-      if (wholeWidth <= CANVAS_SAFE_LIMIT && wholeHeight + EXPORT_HEADER_HEIGHT <= CANVAS_SAFE_LIMIT) {
+      const wholeCrossExtra = isHorizontal ? labelGutterReserve : EXPORT_HEADER_HEIGHT;
+      const wholeMainExtra = isHorizontal ? EXPORT_HEADER_HEIGHT : labelGutterReserve;
+      if (wholeWidth + wholeCrossExtra <= CANVAS_SAFE_LIMIT && wholeHeight + wholeMainExtra <= CANVAS_SAFE_LIMIT) {
         const capture = await captureFlowchartPng(bounds);
-        const headered = await composeExportHeader(capture.dataUrl, capture.width, capture.height, title);
+        const withLabels = await composeExportLaneLabels(capture, bounds, sortedLanes, orientation);
+        const headered = await composeExportHeader(withLabels.dataUrl, withLabels.width, withLabels.height, title);
         const pdf = addPdfPage(null, headered.width, headered.height);
         pdf.addImage(headered.dataUrl, "PNG", 0, 0, headered.width, headered.height);
         pdf.save(`${slugify(title)}.pdf`);
@@ -675,13 +676,8 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       }
 
       // No entra: se parte en una página por subproceso (nunca a la mitad
-      // de un cuadro), repitiendo la columna de carriles a la izquierda.
-      const labelSize = Math.min(PDF_LABEL_STRIP_WIDTH, crossTotal);
-      const labelCapture = await captureFlowchartPng(crossBounds(crossStart, labelSize));
-      const labelDataUrl = labelCapture.dataUrl;
-      const labelImgW = labelCapture.width;
-      const labelImgH = labelCapture.height;
-
+      // de un cuadro), repitiendo la columna de nombres de carril en cada
+      // página para saber qué puesto es cada fila.
       const ranges: { start: number; size: number }[] = [];
       if (sortedSections.length > 0) {
         sortedSections.forEach((section, i) => {
@@ -692,20 +688,18 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
         });
       } else {
         // Sin subprocesos definidos: se cae a franjas de ancho fijo.
-        const contentStart = crossStart + labelSize;
-        const contentTotal = Math.max(0, crossEnd - contentStart);
-        const count = Math.max(1, Math.ceil(contentTotal / PDF_SLICE_SIZE));
+        const count = Math.max(1, Math.ceil(crossTotal / PDF_SLICE_SIZE));
         for (let i = 0; i < count; i++) {
-          const start = contentStart + i * PDF_SLICE_SIZE;
+          const start = crossStart + i * PDF_SLICE_SIZE;
           ranges.push({ start, size: Math.min(PDF_SLICE_SIZE, crossEnd - start) });
         }
       }
 
       // Si un subproceso en sí mismo sigue sin entrar bajo el límite, se
       // subdivide en franjas más chicas (respaldo, no debería ser común).
-      const maxContentPerPage = Math.max(200, CANVAS_SAFE_LIMIT - labelImgW - EXPORT_PADDING * 2);
+      const maxContentPerPage = Math.max(200, CANVAS_SAFE_LIMIT - labelGutterReserve - EXPORT_PADDING * 2);
       const finalRanges = ranges.flatMap((range) => {
-        if (Math.ceil(range.size) + EXPORT_PADDING * 2 + labelImgW <= CANVAS_SAFE_LIMIT) return [range];
+        if (Math.ceil(range.size) + EXPORT_PADDING * 2 + labelGutterReserve <= CANVAS_SAFE_LIMIT) return [range];
         const subCount = Math.ceil(range.size / maxContentPerPage);
         return Array.from({ length: subCount }, (_, i) => {
           const start = range.start + i * maxContentPerPage;
@@ -716,21 +710,11 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       let pdf: Pdf | null = null;
       for (const range of finalRanges) {
         const sliceSize = Math.max(0, range.size);
-        const sliceCapture = sliceSize > 0 ? await captureFlowchartPng(crossBounds(range.start, sliceSize)) : null;
-        const sliceImgW = sliceCapture?.width ?? 0;
-        const sliceImgH = sliceCapture?.height ?? labelImgH;
-
-        const pageWidth = isHorizontal ? labelImgW + sliceImgW : Math.max(labelImgW, sliceImgW);
-        const pageHeight = isHorizontal ? Math.max(labelImgH, sliceImgH) : labelImgH + sliceImgH;
-
-        const parts = [{ dataUrl: labelDataUrl, x: 0, y: 0, width: labelImgW, height: labelImgH }];
-        if (sliceCapture) {
-          const sliceX = isHorizontal ? labelImgW : 0;
-          const sliceY = isHorizontal ? 0 : labelImgH;
-          parts.push({ dataUrl: sliceCapture.dataUrl, x: sliceX, y: sliceY, width: sliceImgW, height: sliceImgH });
-        }
-        const pageContentUrl = await composePageCanvas(parts, pageWidth, pageHeight);
-        const headered = await composeExportHeader(pageContentUrl, pageWidth, pageHeight, title);
+        if (sliceSize <= 0) continue;
+        const sliceBounds = crossBounds(range.start, sliceSize);
+        const sliceCapture = await captureFlowchartPng(sliceBounds);
+        const withLabels = await composeExportLaneLabels(sliceCapture, sliceBounds, sortedLanes, orientation);
+        const headered = await composeExportHeader(withLabels.dataUrl, withLabels.width, withLabels.height, title);
 
         pdf = addPdfPage(pdf, headered.width, headered.height);
         pdf.addImage(headered.dataUrl, "PNG", 0, 0, headered.width, headered.height);
@@ -1081,12 +1065,6 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
           <Background color="#334155" gap={24} />
           <LaneLayer lanes={lanes} sections={sections} nodes={nodes} orientation={orientation} />
           <SectionLayer sections={sections} lanes={lanes} orientation={orientation} />
-
-          <DiagramLegend
-            categoriesInUse={categoriesInUse}
-            mainOffset={totalLanesThickness(sortedLanes) + 10}
-            orientation={orientation}
-          />
         </ReactFlow>
         <LaneLabelsOverlay lanes={lanes} orientation={orientation} />
       </div>

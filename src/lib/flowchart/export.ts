@@ -12,7 +12,6 @@ import {
 import type { FlowchartNode, Lane, LaneOrientation, Section } from "./types";
 
 export const EXPORT_PADDING = 24;
-const LEGEND_RESERVE = 60;
 /** Aire extra después del último contenido real, para que el recorte no quede pegado. */
 const CONTENT_MARGIN = 120;
 /** Piso para el eje de flujo cuando el diagrama todavía no tiene nodos. */
@@ -32,13 +31,11 @@ export type ExportBounds = { x: number; y: number; width: number; height: number
 export function computeExportBounds(
   lanes: Lane[],
   nodes: FlowchartNode[],
-  hasLegend: boolean,
   orientation: LaneOrientation,
   sections: Section[] = []
 ): ExportBounds {
   const sortedLanes = [...lanes].sort((a, b) => a.order - b.order);
   const sectionReserve = sections.length > 0 ? SECTION_HEADER_RESERVE : 0;
-  const legendReserve = hasLegend ? LEGEND_RESERVE : 0;
   const nodeBounds = nodes.length > 0 ? getNodesBounds(nodes) : null;
 
   let mainStart = 0;
@@ -50,7 +47,6 @@ export function computeExportBounds(
     mainStart = laneMainStart(sortedLanes, minIndex);
     mainEnd = laneMainStart(sortedLanes, maxIndex) + laneThickness(sortedLanes[maxIndex]);
   }
-  mainEnd += legendReserve;
 
   const crossEnd = nodeBounds
     ? (orientation === "horizontal" ? nodeBounds.x + nodeBounds.width : nodeBounds.y + nodeBounds.height) +
@@ -129,23 +125,104 @@ function loadLogo(): Promise<HTMLImageElement> {
   return cachedLogo;
 }
 
-/** Junta varias imágenes ya capturadas en un solo canvas (p. ej. la franja de
- * carriles + el bloque de contenido de una página del PDF partido). */
-export async function composePageCanvas(
-  parts: { dataUrl: string; x: number; y: number; width: number; height: number }[],
-  width: number,
-  height: number
-): Promise<string> {
-  const images = await Promise.all(parts.map((p) => loadImage(p.dataUrl)));
+/** Ancho máximo de la columna de nombres de carril agregada a los exports. */
+export const LANE_LABEL_GUTTER = 240;
+const LANE_LABEL_PADDING = 10;
+const LANE_LABEL_FONT = "600 12px Arial, sans-serif";
+const LANE_LABEL_LINE_HEIGHT = 15;
+const LANE_LABEL_MAX_LINES = 3;
+
+/** Corta `text` en líneas que entren en `maxWidth`, partiendo por palabra. */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const attempt = current ? `${current} ${word}` : word;
+    if (current && ctx.measureText(attempt).width > maxWidth) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = attempt;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+function drawLaneLabelBands(
+  ctx: CanvasRenderingContext2D,
+  sortedLanes: Lane[],
+  orientation: LaneOrientation,
+  viewport: { x: number; y: number; zoom: number },
+  gutterOrigin: number,
+  gutterThickness: number
+) {
+  const isHorizontal = orientation === "horizontal";
+  const panMain = isHorizontal ? viewport.y : viewport.x;
+
+  sortedLanes.forEach((lane, index) => {
+    const mainStart = laneMainStart(sortedLanes, index);
+    const thickness = laneThickness(lane);
+    const pixelStart = mainStart * viewport.zoom + panMain;
+    const pixelEnd = (mainStart + thickness) * viewport.zoom + panMain;
+
+    const rectX = isHorizontal ? gutterOrigin : pixelStart;
+    const rectY = isHorizontal ? pixelStart : gutterOrigin;
+    const rectW = isHorizontal ? gutterThickness : pixelEnd - pixelStart;
+    const rectH = isHorizontal ? pixelEnd - pixelStart : gutterThickness;
+
+    ctx.fillStyle = index % 2 === 0 ? "#f4f4f5" : "#e4e4e7";
+    ctx.fillRect(rectX, rectY, rectW, rectH);
+    ctx.strokeStyle = "#d4d4d8";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rectX + 0.5, rectY + 0.5, Math.max(0, rectW - 1), Math.max(0, rectH - 1));
+
+    ctx.fillStyle = "#18181b";
+    ctx.font = LANE_LABEL_FONT;
+    ctx.textBaseline = "middle";
+    const maxTextWidth = Math.max(10, rectW - LANE_LABEL_PADDING * 2);
+    const lines = wrapText(ctx, lane.label, maxTextWidth).slice(0, LANE_LABEL_MAX_LINES);
+    const totalTextHeight = lines.length * LANE_LABEL_LINE_HEIGHT;
+    const startY = rectY + rectH / 2 - totalTextHeight / 2 + LANE_LABEL_LINE_HEIGHT / 2;
+    lines.forEach((line, i) => {
+      ctx.fillText(line, rectX + LANE_LABEL_PADDING, startY + i * LANE_LABEL_LINE_HEIGHT, maxTextWidth);
+    });
+  });
+}
+
+/** Agrega una columna con el nombre completo de cada carril (sin cortar) al
+ * borde del export, alineada pixel a pixel con las bandas reales usando la
+ * misma transformación de viewport con la que se capturó el contenido. */
+export async function composeExportLaneLabels(
+  content: CapturedPng,
+  bounds: ExportBounds,
+  lanes: Lane[],
+  orientation: LaneOrientation
+): Promise<CapturedPng> {
+  const sortedLanes = [...lanes].sort((a, b) => a.order - b.order);
+  if (sortedLanes.length === 0) return content;
+
+  const img = await loadImage(content.dataUrl);
+  const viewport = getViewportForBounds(bounds, content.width, content.height, 0.1, 2, "0px");
+  const gutterPx = Math.round(LANE_LABEL_GUTTER * viewport.zoom);
+  const isHorizontal = orientation === "horizontal";
+
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = isHorizontal ? content.width + gutterPx : content.width;
+  canvas.height = isHorizontal ? content.height : content.height + gutterPx;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("No se pudo componer la página del export");
+  if (!ctx) throw new Error("No se pudo componer los nombres de carril del export");
+
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, width, height);
-  parts.forEach((part, i) => ctx.drawImage(images[i], part.x, part.y, part.width, part.height));
-  return canvas.toDataURL("image/png");
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const contentX = isHorizontal ? gutterPx : 0;
+  const contentY = isHorizontal ? 0 : gutterPx;
+  ctx.drawImage(img, contentX, contentY);
+
+  drawLaneLabelBands(ctx, sortedLanes, orientation, viewport, 0, gutterPx);
+
+  return { dataUrl: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height };
 }
 
 /** Agrega una franja superior con el logo de Caldenes y el nombre del
