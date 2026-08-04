@@ -66,10 +66,13 @@ import { flowchartDataSchema } from "@/lib/flowchart/schema";
 import {
   computeExportBounds,
   captureFlowchartPng,
+  composeExportHeader,
+  composePageCanvas,
   downloadDataUrl,
   downloadBlob,
   slugify,
   EXPORT_PADDING,
+  EXPORT_HEADER_HEIGHT,
   type ExportBounds,
 } from "@/lib/flowchart/export";
 import type {
@@ -622,8 +625,9 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
     setExporting("png");
     try {
       const bounds = computeExportBounds(lanes, nodes, categoriesInUse.size > 0, orientation, sections);
-      const dataUrl = await captureFlowchartPng(bounds);
-      downloadDataUrl(dataUrl, `${slugify(title)}.png`);
+      const capture = await captureFlowchartPng(bounds);
+      const headered = await composeExportHeader(capture.dataUrl, capture.width, capture.height, title);
+      downloadDataUrl(headered.dataUrl, `${slugify(title)}.png`);
     } catch {
       window.alert("No se pudo exportar el PNG. Probá de nuevo.");
     } finally {
@@ -661,10 +665,11 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       // navegador, se exporta tal cual, en una sola página.
       const wholeWidth = Math.ceil(crossTotal) + EXPORT_PADDING * 2;
       const wholeHeight = Math.ceil(mainTotal) + EXPORT_PADDING * 2;
-      if (wholeWidth <= CANVAS_SAFE_LIMIT && wholeHeight <= CANVAS_SAFE_LIMIT) {
-        const dataUrl = await captureFlowchartPng(bounds);
-        const pdf = addPdfPage(null, wholeWidth, wholeHeight);
-        pdf.addImage(dataUrl, "PNG", 0, 0, wholeWidth, wholeHeight);
+      if (wholeWidth <= CANVAS_SAFE_LIMIT && wholeHeight + EXPORT_HEADER_HEIGHT <= CANVAS_SAFE_LIMIT) {
+        const capture = await captureFlowchartPng(bounds);
+        const headered = await composeExportHeader(capture.dataUrl, capture.width, capture.height, title);
+        const pdf = addPdfPage(null, headered.width, headered.height);
+        pdf.addImage(headered.dataUrl, "PNG", 0, 0, headered.width, headered.height);
         pdf.save(`${slugify(title)}.pdf`);
         return;
       }
@@ -672,9 +677,10 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       // No entra: se parte en una página por subproceso (nunca a la mitad
       // de un cuadro), repitiendo la columna de carriles a la izquierda.
       const labelSize = Math.min(PDF_LABEL_STRIP_WIDTH, crossTotal);
-      const labelDataUrl = await captureFlowchartPng(crossBounds(crossStart, labelSize));
-      const labelImgW = Math.ceil(labelSize) + EXPORT_PADDING * 2;
-      const labelImgH = Math.ceil(mainTotal) + EXPORT_PADDING * 2;
+      const labelCapture = await captureFlowchartPng(crossBounds(crossStart, labelSize));
+      const labelDataUrl = labelCapture.dataUrl;
+      const labelImgW = labelCapture.width;
+      const labelImgH = labelCapture.height;
 
       const ranges: { start: number; size: number }[] = [];
       if (sortedSections.length > 0) {
@@ -710,20 +716,24 @@ function FlowchartCanvas({ title, initialData, onSave }: FlowchartEditorProps) {
       let pdf: Pdf | null = null;
       for (const range of finalRanges) {
         const sliceSize = Math.max(0, range.size);
-        const sliceDataUrl = sliceSize > 0 ? await captureFlowchartPng(crossBounds(range.start, sliceSize)) : null;
-        const sliceImgW = Math.ceil(sliceSize) + EXPORT_PADDING * 2;
-        const sliceImgH = labelImgH;
+        const sliceCapture = sliceSize > 0 ? await captureFlowchartPng(crossBounds(range.start, sliceSize)) : null;
+        const sliceImgW = sliceCapture?.width ?? 0;
+        const sliceImgH = sliceCapture?.height ?? labelImgH;
 
         const pageWidth = isHorizontal ? labelImgW + sliceImgW : Math.max(labelImgW, sliceImgW);
         const pageHeight = isHorizontal ? Math.max(labelImgH, sliceImgH) : labelImgH + sliceImgH;
 
-        pdf = addPdfPage(pdf, pageWidth, pageHeight);
-        pdf.addImage(labelDataUrl, "PNG", 0, 0, labelImgW, labelImgH);
-        if (sliceDataUrl) {
+        const parts = [{ dataUrl: labelDataUrl, x: 0, y: 0, width: labelImgW, height: labelImgH }];
+        if (sliceCapture) {
           const sliceX = isHorizontal ? labelImgW : 0;
           const sliceY = isHorizontal ? 0 : labelImgH;
-          pdf.addImage(sliceDataUrl, "PNG", sliceX, sliceY, sliceImgW, sliceImgH);
+          parts.push({ dataUrl: sliceCapture.dataUrl, x: sliceX, y: sliceY, width: sliceImgW, height: sliceImgH });
         }
+        const pageContentUrl = await composePageCanvas(parts, pageWidth, pageHeight);
+        const headered = await composeExportHeader(pageContentUrl, pageWidth, pageHeight, title);
+
+        pdf = addPdfPage(pdf, headered.width, headered.height);
+        pdf.addImage(headered.dataUrl, "PNG", 0, 0, headered.width, headered.height);
       }
 
       pdf?.save(`${slugify(title)}.pdf`);
